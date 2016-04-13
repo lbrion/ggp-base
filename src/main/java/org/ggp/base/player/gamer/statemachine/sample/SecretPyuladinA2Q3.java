@@ -41,10 +41,16 @@ public class SecretPyuladinA2Q3 extends SampleGamer {
 
     		if(theScore == 1) {
     			selection = moves.get(i);
+    			System.out.println("We found definite victory");
     			break;
     		}
     		else if(theScore == 0) {
     			selection = moves.get(i);
+    			System.out.println("Updated to make best move. Still anyone's game.");
+    		}
+
+    		else {
+    			System.out.println("We lose to best play.");
     		}
         }
 
@@ -56,22 +62,78 @@ public class SecretPyuladinA2Q3 extends SampleGamer {
 	int searchMove(MachineState theState, Move myMove) {
 		StateMachine theMachine = getStateMachine();
 
+		// recursive base case
+		if (theMachine.isTerminal(theState)) {
+			int reward = 0;
+
+			try {
+				reward = theMachine.findReward(getRole(), theState);
+			} catch (GoalDefinitionException e) {
+		        // should never reach this point - if is terminal then there is reward
+				e.printStackTrace();
+				return 0;
+			}
+
+			if (reward == 100) {
+				//System.out.println("We will win!");
+				return 1;
+			} else if (reward == 0) {
+				//System.out.println("We will lose.");
+				return -1;
+			}
+
+			//System.out.println("It's a tie");
+			return 0;
+		}
+
 		//TODO: Do the recursion correctly and should work, read comment
 		//above.
 		try {
-			for(Move move: theMachine.findLegals(getRole(), theState)) {
-				List<Move> nextMove = new List<Move>();
-				nextMove.add(move);
-				if(theMachine.isTerminal(theMachine.getNextState(theState, nextMove))) {
+			int myMoveScore = 0;
+			boolean isDefiniteVictory = true;
+			boolean isDefiniteDefeat = false;
 
+			for(List<Move> jointMove: theMachine.getLegalJointMoves(theState, getRole(), myMove)) {
+				MachineState nextState = theMachine.findNext(jointMove, theState);
+
+				if (theMachine.isTerminal(nextState)) {
+					return searchMove(nextState, null);
+				}
+
+				List<Move> moves = theMachine.findLegals(getRole(), nextState);
+
+				boolean victoryInBranch = false;
+				boolean tieInBranch = false;
+
+				for (Move nextNextMove : moves) {
+					int nextNextMoveScore = searchMove(nextState, nextNextMove);
+
+					if (nextNextMoveScore == 1) {
+						victoryInBranch = true;
+					} else if (nextNextMoveScore == 0) {
+						tieInBranch = true;
+					}
+				}
+
+				if (!victoryInBranch) {
+					isDefiniteVictory = false;
+
+					if (!tieInBranch) {
+						isDefiniteDefeat = true;
+					}
 				}
 			}
+
+			if (isDefiniteVictory)
+				myMoveScore = 1;
+
+			if (isDefiniteDefeat)
+				myMoveScore = -1;
+
+			return myMoveScore;
 		} catch (MoveDefinitionException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
-			return -1;
 		} catch (TransitionDefinitionException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
