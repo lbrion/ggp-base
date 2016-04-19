@@ -4,7 +4,9 @@ import java.util.List;
 import java.util.Random;
 
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
+import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
+import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.StateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
@@ -15,7 +17,7 @@ public class FaceHunter extends SampleGamer {
 
 	@Override
 	public String getName() {
-        return "Secret Pyuladin";
+        return "";
     }
 
 	@Override
@@ -25,17 +27,25 @@ public class FaceHunter extends SampleGamer {
         long start = System.currentTimeMillis();
         long finishBy = timeout - 1000;
 
-        List<Move> moves = thisMachine.findLegals(getRole(), getCurrentState());
-        Move selection = (moves.get(r.nextInt(moves.size())));
+        List<Move> actions = thisMachine.findLegals(getRole(), getCurrentState());
+        Move selection = (actions.get(r.nextInt(actions.size())));
 
-        for (Move consideredMove : moves) {
-        	//MachineState consideredState = thisMachine.findNext(consideredMove, getCurrentState());
+        int score = 0;
+
+        for(int i = 0; i < actions.size(); i++) {
+        	int result = minscore(getRole(), actions.get(i), getCurrentState());
         }
 
         long stop = System.currentTimeMillis();
-        notifyObservers(new GamerSelectedMoveEvent(moves, selection, stop - start));
+        notifyObservers(new GamerSelectedMoveEvent(actions, selection, stop - start));
 		return selection;
     }
+
+	public int minscore(Role role, Move action, MachineState state) {
+
+
+		return 0;
+	}
 
 	@Override
 	public void stateMachineMetaGame(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
