@@ -22,7 +22,7 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
 public class FaceHunter extends SampleGamer {
 	private Random r = new Random();
-	private int limit = 4; //Arbitrary int depth limit
+	private int limit = 3; //Arbitrary int depth limit
 	private Map<String, Double> goalCache = new HashMap<String, Double>();
 
 	@Override
@@ -44,7 +44,7 @@ public class FaceHunter extends SampleGamer {
         int score = 0;
 
         for(int i = 0; i < actions.size(); i++) {
-        	//if (System.currentTimeMillis() > finishBy) break;
+        	if (System.currentTimeMillis() > finishBy) break;
 
         	int result = minscore(getRole(), actions.get(i), getCurrentState(), 0);
         	if(result > score) {
@@ -67,7 +67,12 @@ public class FaceHunter extends SampleGamer {
 			return game.findReward(role, state);
 		}
 
-		if(level >= limit) return evalGoalProximity(state); //This is where you would return eval function
+		if(level >= limit)
+			return mixedEvalFn(state); //This is where you would return eval function
+			//return 0;
+			//return evalOurMobility(state, true);
+			//return evalGoalProximity(state);
+			//return evalOpponentMobility(state);
 
 		int score = 0;
 
@@ -100,6 +105,8 @@ public class FaceHunter extends SampleGamer {
 			}
 		}
 
+		if(opponent == null) opponent = role;
+
 		List<Move> actions = game.findLegals(opponent, state);
 
 		int score = 100;
@@ -127,15 +134,22 @@ public class FaceHunter extends SampleGamer {
 	}
 
 	public int mixedEvalFn(MachineState state) {
+		// scores should be from 0 to 100
+		List<Integer> scores = new ArrayList<Integer>();
+		scores.add(evalOurMobility(state, true));
+		scores.add(evalOpponentMobility(state));
+		scores.add(evalGoalProximity(state));
+
+		// weights should add up to 1
+		List<Double> weights = new ArrayList<Double>();
+		weights.add(0.25);
+		weights.add(0.25);
+		weights.add(0.5);
+
 		double compositeScore = 0;
-		int scoreOurMobility = evalOurMobility(state, true);
-		int scoreOpponentMobility = evalOpponentMobility(state);
-		//int
-
-		double weightOurMobility = 0.5;
-		double weightOpponentMobility = 0.5;
-
-		compositeScore = (scoreOurMobility * weightOurMobility) + (scoreOpponentMobility * weightOpponentMobility);
+		for (int i = 0; i < scores.size(); i++) {
+			compositeScore += scores.get(i) * weights.get(i);
+		}
 
 		return (int)compositeScore;
 	}
@@ -146,8 +160,6 @@ public class FaceHunter extends SampleGamer {
 	 *             whether or not we favor mobility (true) or focus (false)
 	 */
 	public int evalOurMobility(MachineState state, boolean favorMobility) {
-		System.out.println(state.getContents());
-
 		StateMachine machine = getStateMachine();
 		int nLegalMoves, nMoves;
 
@@ -159,7 +171,10 @@ public class FaceHunter extends SampleGamer {
 			return -1;
 		}
 
-		double percentageMobility = ((double) nLegalMoves) / nMoves * 100;
+		double percentageMobility = 0;
+
+		if (nMoves != 0)
+			percentageMobility = ((double) nLegalMoves) / nMoves * 100;
 
 		if (!favorMobility)
 			percentageMobility = 100 - percentageMobility;
@@ -189,7 +204,10 @@ public class FaceHunter extends SampleGamer {
 			}
 		}
 
-		double percentageMobility = ((double) nLegalMoves) / nMoves * 100;
+		double percentageMobility = 0;
+
+		if (nMoves != 0)
+			percentageMobility = 100 - (((double) nLegalMoves) / nMoves * 100);
 
 		return (int)percentageMobility;
 	}
@@ -200,6 +218,7 @@ public class FaceHunter extends SampleGamer {
 	 * arguments: state that we are evaluating currently.
 	 */
 	public int evalGoalProximity(MachineState state) {
+		StateMachine game = getStateMachine();
 		// if no meta gaming was done or if not enough time was given in the metagame
 		if (goalCache.size() == 0) {
 			System.out.println("Cache was empty");
@@ -215,7 +234,6 @@ public class FaceHunter extends SampleGamer {
 			String statement = gdlStatements.get(0).toString();
 
 			if (!goalCache.containsKey(statement)) {
-				System.out.println("Statement not seen before in cache.");
 				continue;
 			}
 
@@ -223,10 +241,15 @@ public class FaceHunter extends SampleGamer {
 		}
 
 		score = (score / currGdl.size()) * 100;
-		System.out.println("Score: " + score);
-		System.out.println("-------------------------");
+		//System.out.println("Score: " + score);
+		//System.out.println("-------------------------");
 
-		return 0;
+		try {
+			score += game.getGoal(state, getRole());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return (int)score;
 	}
 
 	/* Simulates playing games during metagame period. When we reach a terminal state,
