@@ -3,10 +3,15 @@
 package org.ggp.base.player.gamer.statemachine.sample;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
+import org.ggp.base.util.gdl.grammar.GdlSentence;
+import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.Role;
@@ -17,7 +22,8 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
 public class FaceHunter extends SampleGamer {
 	private Random r = new Random();
-	private int limit = 3; //Arbitrary int depth limit
+	private int limit = 4; //Arbitrary int depth limit
+	private Map<String, Double> goalCache = new HashMap<String, Double>();
 
 	@Override
 	public String getName() {
@@ -54,14 +60,14 @@ public class FaceHunter extends SampleGamer {
 
 	public int maxscore(Role role, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException
 	{
-		System.out.println("Maxing");
+		//System.out.println("Maxing");
 		StateMachine game = getStateMachine();
 
 		if(game.isTerminal(state)) {
 			return game.findReward(role, state);
 		}
 
-		if(level >= limit) return 0; //This is where you would return eval function
+		if(level >= limit) return evalGoalProximity(state); //This is where you would return eval function
 
 		int score = 0;
 
@@ -82,7 +88,7 @@ public class FaceHunter extends SampleGamer {
 
 	public int minscore(Role role, Move action, MachineState state, int level) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException
 	{
-		System.out.println("Mining");
+		//System.out.println("Mining");
 
 		StateMachine game = getStateMachine();
 
@@ -120,9 +126,164 @@ public class FaceHunter extends SampleGamer {
 		return score;
 	}
 
+	public int mixedEvalFn(MachineState state) {
+		double compositeScore = 0;
+		int scoreOurMobility = evalOurMobility(state, true);
+		int scoreOpponentMobility = evalOpponentMobility(state);
+		//int
+
+		double weightOurMobility = 0.5;
+		double weightOpponentMobility = 0.5;
+
+		compositeScore = (scoreOurMobility * weightOurMobility) + (scoreOpponentMobility * weightOpponentMobility);
+
+		return (int)compositeScore;
+	}
+
+	/* Heuristic function to evaluate a state based on our player's mobility.
+	 *
+	 * arguments : state that we are evaluating currently,
+	 *             whether or not we favor mobility (true) or focus (false)
+	 */
+	public int evalOurMobility(MachineState state, boolean favorMobility) {
+		System.out.println(state.getContents());
+
+		StateMachine machine = getStateMachine();
+		int nLegalMoves, nMoves;
+
+		try {
+			nLegalMoves = machine.getLegalMoves(state, getRole()).size();
+			nMoves = machine.findActions(getRole()).size();
+		} catch (Exception e) {
+			e.printStackTrace();
+			return -1;
+		}
+
+		double percentageMobility = ((double) nLegalMoves) / nMoves * 100;
+
+		if (!favorMobility)
+			percentageMobility = 100 - percentageMobility;
+
+		return (int)percentageMobility;
+	}
+
+	/* Heuristic function to evaluate a state based on our opponent's mobility (less choices = better).
+	 * Should work for more than 2 player games as well (not tested).
+	 *
+	 * arguments: state that we are evaluating currently,
+	 */
+	public int evalOpponentMobility(MachineState state) {
+		StateMachine machine = getStateMachine();
+		int nLegalMoves = 0;
+		int nMoves = 0;
+
+		for (Role r : machine.findRoles()) {
+			if (r.equals(getRole())) continue;
+
+			try {
+				nLegalMoves += machine.getLegalMoves(state, r).size();
+				nMoves += machine.findActions(r).size();
+			} catch (Exception e) {
+				e.printStackTrace();
+				return -1;
+			}
+		}
+
+		double percentageMobility = ((double) nLegalMoves) / nMoves * 100;
+
+		return (int)percentageMobility;
+	}
+
+	/* Heuristic function to evaluate a state based on the GDL constraints.
+	 * Compares state to terminal states found in meta gaming.
+	 *
+	 * arguments: state that we are evaluating currently.
+	 */
+	public int evalGoalProximity(MachineState state) {
+		// if no meta gaming was done or if not enough time was given in the metagame
+		if (goalCache.size() == 0) {
+			System.out.println("Cache was empty");
+			return 0;
+		}
+
+		Set<GdlSentence> currGdl = state.getContents();
+		double score = 0;
+
+		for (GdlSentence g : currGdl) {
+			List<GdlTerm> gdlStatements = g.getBody();
+			if (gdlStatements.size() < 1) continue;
+			String statement = gdlStatements.get(0).toString();
+
+			if (!goalCache.containsKey(statement)) {
+				System.out.println("Statement not seen before in cache.");
+				continue;
+			}
+
+			score += goalCache.get(statement);
+		}
+
+		score = (score / currGdl.size()) * 100;
+		System.out.println("Score: " + score);
+		System.out.println("-------------------------");
+
+		return 0;
+	}
+
+	/* Simulates playing games during metagame period. When we reach a terminal state,
+	 * we look at the GDL statements and record it in the class variable goalCache.
+	 *
+	 * This is used in evalGoalProximity() as a heuristic.
+	 */
 	@Override
 	public void stateMachineMetaGame(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
     {
-        // Paladins don't do no metagaming at the beginning of the match.
+        int nGamesPlayed = 0;
+        StateMachine game = getStateMachine();
+
+        while (true) {
+        	MachineState nextState = game.getInitialState();
+
+        	if (System.currentTimeMillis() > timeout - 1000)
+        		break;
+
+        	boolean gameFinished = false;
+        	while(!gameFinished) {
+        		if (System.currentTimeMillis() > timeout - 1000)
+            		gameFinished = true;
+
+        		if (game.isTerminal(nextState)) {
+        			// reached end of simulated game - time to update goalCache
+        			gameFinished = true;
+        			nGamesPlayed++;
+        			if (game.findReward(getRole(), nextState) == 0) break;
+
+        			Set<GdlSentence> gdl = nextState.getContents();
+        			for (GdlSentence g : gdl) {
+        				List<GdlTerm> gdlStatements = g.getBody();
+        				if (gdlStatements.size() < 1) continue;
+        				String statement = gdlStatements.get(0).toString();
+
+        				if (!goalCache.containsKey(statement))
+        					goalCache.put(statement, 0.0);
+
+        				goalCache.put(statement, goalCache.get(statement) + 1);
+        			}
+
+        			break;
+        		}
+
+        		List<MachineState> possibleNextStates = game.getNextStates(nextState);
+        		nextState = (possibleNextStates.get(r.nextInt(possibleNextStates.size())));
+        	}
+        }
+
+        System.out.println("[META] We played: " + nGamesPlayed + " games.");
+
+        if (nGamesPlayed != 0) {
+        	for (String s : goalCache.keySet()) {
+        		double currentValue = goalCache.get(s);
+        		goalCache.put(s, currentValue / nGamesPlayed);
+        	}
+        }
     }
 }
