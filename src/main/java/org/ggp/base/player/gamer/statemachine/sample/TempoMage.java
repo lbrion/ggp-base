@@ -22,8 +22,9 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
 public class TempoMage extends SampleGamer {
 	private Random r = new Random();
-	private int limit = 3; //Arbitrary int depth limit
+	private int limit = 5; //Arbitrary int depth limit
 	private Map<String, Double> goalCache = new HashMap<String, Double>();
+	private long finishBy;
 
 	@Override
 	public String getName() {
@@ -36,16 +37,21 @@ public class TempoMage extends SampleGamer {
 		System.out.println("Starting");
 		StateMachine game = getStateMachine();
         long start = System.currentTimeMillis();
-        long finishBy = timeout - 1000;
+        finishBy = timeout - 1000;
 
         List<Move> actions = game.findLegals(getRole(), getCurrentState());
-        Move selection = (actions.get(r.nextInt(actions.size())));
+        int actionSize = actions.size();
+
+        if(actionSize <= 4) limit = 9;
+        else limit = 5;
+
+        Move selection = (actions.get(r.nextInt(actionSize)));
 
         int score = 0;
 
         for(int i = 0; i < actions.size(); i++) {
         	if (System.currentTimeMillis() > finishBy) break;
-
+        	System.out.println("Traversing move " + i + " of " + actionSize);
         	int result = minscore(getRole(), actions.get(i), getCurrentState(), 0);
         	if(result > score) {
         		score = result;
@@ -100,7 +106,10 @@ public class TempoMage extends SampleGamer {
 		}
 
 		if(level >= limit)
+		{
+			//System.out.println("Entering montecarlo");
 			return montecarlo(role, state, 4); //This is where it's different from depth bounded
+		}
 
 		int score = 0;
 
@@ -124,12 +133,15 @@ public class TempoMage extends SampleGamer {
 		for(int i = 0; i < count; i++) {
 			total = total + depthcharge(role, state);
 		}
-
+		//System.out.println("Exiting montecarlo");
 		return total / count;
 	}
 
 	public int depthcharge(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
 		StateMachine game = getStateMachine();
+    	if (System.currentTimeMillis() > finishBy) {
+    		return mixedEvalFn(state);
+    	}
 
 		if(game.isTerminal(state)) {
 			return game.findReward(role, state);
@@ -166,6 +178,8 @@ public class TempoMage extends SampleGamer {
 		int score = 100;
 
 		for(int i = 0; i < actions.size(); i++) {
+        	if (System.currentTimeMillis() > finishBy) break;
+
 			List<Move> move = new ArrayList<Move>();
 			if(role.equals(game.getRoles().get(0))) {
 				move.add(action);
@@ -316,6 +330,11 @@ public class TempoMage extends SampleGamer {
     {
         int nGamesPlayed = 0;
         StateMachine game = getStateMachine();
+
+        if(game.getRoles().size() > 1) {
+        	limit = 2;
+        }
+        else limit = 5;
 
         while (true) {
         	MachineState nextState = game.getInitialState();
