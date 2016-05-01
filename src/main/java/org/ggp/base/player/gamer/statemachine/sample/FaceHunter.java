@@ -143,8 +143,8 @@ public class FaceHunter extends SampleGamer {
 		// weights should add up to 1
 		List<Double> weights = new ArrayList<Double>();
 		weights.add(0.25);
-		weights.add(0.25);
-		weights.add(0.5);
+		weights.add(0.35);
+		weights.add(0.4);
 
 		double compositeScore = 0;
 		for (int i = 0; i < scores.size(); i++) {
