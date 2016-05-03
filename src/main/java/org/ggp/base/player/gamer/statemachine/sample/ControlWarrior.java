@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
 import org.ggp.base.util.GamestateNode;
@@ -26,19 +24,20 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 public class ControlWarrior extends SampleGamer {
 	private Random r = new Random();
 	private Map<String, Double> goalCache = new HashMap<String, Double>();
-	private ConcurrentMap<MachineState, Integer> nodeVisits = new ConcurrentHashMap<MachineState, Integer>();
-	private ConcurrentMap<MachineState, Integer> nodeUtility = new ConcurrentHashMap<MachineState, Integer>();
-	private ConcurrentMap<MachineState, MachineState> nodeParent = new ConcurrentHashMap<MachineState, MachineState>();
+	//private ConcurrentMap<MachineState, Integer> nodeVisits = new ConcurrentHashMap<MachineState, Integer>();
+	//private ConcurrentMap<MachineState, Integer> nodeUtility = new ConcurrentHashMap<MachineState, Integer>();
+	//private ConcurrentMap<MachineState, MachineState> nodeParent = new ConcurrentHashMap<MachineState, MachineState>();
 	private long finishBy;
 	private List<GamestateNode> allNodes = new ArrayList<GamestateNode>();
 	private Map<MachineState, GamestateNode> stateToNode = new HashMap<MachineState, GamestateNode>();
 
 	private boolean isMyTurn;
 	private boolean setMovedFirst = false;
+	private int nMetaGames = 0;
 
 	/* Arbitrary settings that can be modified on-the-go */
-	private int limit = 5;
-	private long finishByTime = 3000;
+	private int nGamesPerSimulation = 6;
+	private long finishByTime = 2000;
 
 	@Override
 	public String getName() {
@@ -78,6 +77,8 @@ public class ControlWarrior extends SampleGamer {
 
         if (stateToNode.containsKey(currentState)) {
         	startNode = stateToNode.get(currentState);
+        	System.out.println(startNode.getUtility());
+        	System.out.println(startNode.getVisits());
         }
 
         else {
@@ -110,46 +111,10 @@ public class ControlWarrior extends SampleGamer {
         	}
         }
 
-        // evaluates which action has highest utility
-        for(int i = 0; i < actions.size(); i++) {
-        	/*List<List<Move>> nextMoves = game.getLegalJointMoves(currentState, getRole(), actions.get(i));
-
-        	int minimum = Integer.MAX_VALUE;
-        	for (int j = 0; j < nextMoves.size(); j++) {
-        		MachineState nextState = game.findNext(nextMoves.get(j), currentState);
-        		int nextStateUtility = nodeUtility.get(nextState);
-
-                if (nextStateUtility < minimum) minimum = nextStateUtility;
-        	}
-
-        	if (minimum > score) {
-        		score = minimum;
-        		selection = actions.get(i);
-        	}*/
-
-        	/*List<Move> only_my_move = new ArrayList<Move>();
-        	for(int j = 0; j < game.getRoles().size(); j++) {
-        		if (game.getRoles().get(j).equals(getRole()))
-        			only_my_move.add(actions.get(i));
-        		else
-        			only_my_move.add(null);
-    		}
-
-        	MachineState nextState = game.findNext(only_my_move, currentState);
-
-        	List<Move> t = game.findLegals(getRole(), nextState);
-        	System.out.println(t);
-
-        	int nextUtil = nodeUtility.get(nextState);
-
-        	if (nextUtil > score) {
-        		score = nextUtil;
-        		selection = actions.get(i);
-        	}*/
-        }
-
         System.out.println("[Score]: " + score);
+
         long stop = System.currentTimeMillis();
+        System.out.println("Used " + (stop - start) + " milliseconds. ");
         notifyObservers(new GamerSelectedMoveEvent(actions, selection, stop - start));
 		return selection;
     }
@@ -166,7 +131,7 @@ public class ControlWarrior extends SampleGamer {
 		expand(selectedNode);
 
 		// simulate
-		int value = montecarlo(getRole(), selectedNode.getState(), 9);
+		int value = montecarlo(getRole(), selectedNode.getState(), nGamesPerSimulation);
 
 		// back-propagate
 		propagate(selectedNode, value);
@@ -455,11 +420,7 @@ public class ControlWarrior extends SampleGamer {
         int nGamesPlayed = 0;
         StateMachine game = getStateMachine();
         finishBy = timeout - finishByTime;
-
-        if(game.getRoles().size() > 1) {
-        	limit = 2;
-        }
-        else limit = 5;
+        long totalTime = timeout - System.currentTimeMillis();
 
         while (true) {
         	MachineState nextState = game.getInitialState();
@@ -498,13 +459,29 @@ public class ControlWarrior extends SampleGamer {
         	}
         }
 
-        System.out.println("[META] We played: " + nGamesPlayed + " games.");
+        System.out.println("[META] We played: " + nGamesPlayed + " games in " + (totalTime / 1000) + " seconds.");
 
         if (nGamesPlayed != 0) {
         	for (String s : goalCache.keySet()) {
         		double currentValue = goalCache.get(s);
         		goalCache.put(s, currentValue / nGamesPlayed);
         	}
+        }
+
+        nMetaGames = nGamesPlayed;
+        double gamesPerSecond = ((double) nMetaGames) / totalTime;
+        gamesPerSecond *= 1000;
+
+        if (gamesPerSecond > 100) {
+        	nGamesPerSimulation = 25;
+        } else if (gamesPerSecond > 10) {
+        	nGamesPerSimulation = 10;
+        } else if (gamesPerSecond > 5) {
+        	nGamesPerSimulation = 6;
+        } else if (gamesPerSecond > 1) {
+        	nGamesPerSimulation = 3;
+        } else {
+        	nGamesPerSimulation = 2;
         }
     }
 }
