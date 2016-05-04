@@ -7,12 +7,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
 import org.ggp.base.util.GamestateNode;
-import org.ggp.base.util.gdl.grammar.GdlSentence;
-import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.Role;
@@ -23,7 +20,7 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
 public class ControlWarrior extends SampleGamer {
 	private Random r = new Random();
-	private Map<String, Double> goalCache = new HashMap<String, Double>();
+	//private Map<String, Double> goalCache = new HashMap<String, Double>();
 	//private ConcurrentMap<MachineState, Integer> nodeVisits = new ConcurrentHashMap<MachineState, Integer>();
 	//private ConcurrentMap<MachineState, Integer> nodeUtility = new ConcurrentHashMap<MachineState, Integer>();
 	//private ConcurrentMap<MachineState, MachineState> nodeParent = new ConcurrentHashMap<MachineState, MachineState>();
@@ -34,9 +31,11 @@ public class ControlWarrior extends SampleGamer {
 	private boolean isMyTurn;
 	private boolean setMovedFirst = false;
 	private int nMetaGames = 0;
+	private int nDepthChargesTurn = 0;
+	private int nDepthChargesGame = 0;
 
 	/* Arbitrary settings that can be modified on-the-go */
-	private int nGamesPerSimulation = 6;
+	private int nGamesPerSimulation = 6; // currently can't be controlled here
 	private long finishByTime = 2000;
 
 	@Override
@@ -47,6 +46,7 @@ public class ControlWarrior extends SampleGamer {
 	@Override
 	public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
     {
+		System.out.println();
 		System.out.println("-------- Starting new move -------");
 		StateMachine game = getStateMachine();
         long start = System.currentTimeMillis();
@@ -54,7 +54,10 @@ public class ControlWarrior extends SampleGamer {
 
         List<Move> actions = game.findLegals(getRole(), getCurrentState());
         int actionSize = actions.size();
+        nDepthChargesTurn = 0;
 
+        // keeps track of whose turn it is - for now not used for anything
+        // probably doesn't work in simultaneous game or 2+ person game!
         if (setMovedFirst) isMyTurn = !isMyTurn;
 
         if (actionSize == 1 && actions.get(0).toString().equals("noop")) {
@@ -72,13 +75,18 @@ public class ControlWarrior extends SampleGamer {
 
         Move selection = (actions.get(r.nextInt(actionSize)));
 
+        // sets all nodes to visit again so that algorithm
+        // will go back and run more depth charges
+        for (int i = 0; i < allNodes.size(); i++) {
+        	allNodes.get(i).markShouldVisit(true);
+        }
+
         MachineState currentState = getCurrentState();
         GamestateNode startNode = null;
 
+        // if we find that our state has already been explored in mcts
         if (stateToNode.containsKey(currentState)) {
         	startNode = stateToNode.get(currentState);
-        	System.out.println(startNode.getUtility());
-        	System.out.println(startNode.getVisits());
         }
 
         else {
@@ -87,6 +95,7 @@ public class ControlWarrior extends SampleGamer {
             stateToNode.put(currentState, startNode);
         }
 
+        // main loop to run mcts
         boolean stopSearching = false;
         int count = 0;
         while(true) {
@@ -96,9 +105,12 @@ public class ControlWarrior extends SampleGamer {
         	count++;
         }
 
+        nDepthChargesGame += nDepthChargesTurn;
         System.out.println("[MCTS] " + count + " iterations");
+        System.out.println("[SIMULATED] " + nDepthChargesTurn + " games, [TOTAL] " + nDepthChargesGame);
         double score = 0;
 
+        // find max node over our actions
         for(int i = 0; i < startNode.getChildren().size(); i++) {
         	GamestateNode nextChild = startNode.getChildren().get(i);
         	double utility = nextChild.getUtility() / nextChild.getVisits();
@@ -131,26 +143,35 @@ public class ControlWarrior extends SampleGamer {
 		expand(selectedNode);
 
 		// simulate
-		int value = montecarlo(getRole(), selectedNode.getState(), nGamesPerSimulation);
+		int value = simulate(selectedNode, nGamesPerSimulation);
 
 		// back-propagate
 		propagate(selectedNode, value);
+		selectedNode.markShouldVisit(false);
 		return false;
 	}
 
+	/* Selects the next GamestateNode to look at.
+	 *
+	 * Essentially same as algorithm from lecture.
+	 */
 	public GamestateNode select(GamestateNode stateNode) throws MoveDefinitionException {
 		if (stateNode == null) return null;
-		if (stateNode.getVisits() == 0 && stateNode.isValidState()) return stateNode;
+		//if (stateNode.getVisits() == 0) return stateNode;
+		if (stateNode.shouldVisit()) return stateNode;
 
 		for (int i = 0; i < stateNode.getChildren().size(); i++) {
 			GamestateNode nextChild = stateNode.getChildren().get(i);
-			if (nextChild.getVisits() == 0 && nextChild.isValidState()) return nextChild;
-			else if (nextChild.getVisits() == 0) return select(nextChild);
+			//if (nextChild.getVisits() == 0) return nextChild;
+			if (nextChild.shouldVisit()) return nextChild;
 		}
 
 		GamestateNode result = null;
 		boolean isMyMove = isOurMove(stateNode);
 
+		// selects a min node if opponent is moving and a
+		// max node if we are moving
+		// NOTE: not sure if this is even correct, but it seems to work!?!?!
 		double score = Integer.MAX_VALUE;
 		if (isMyMove)
 			score = Integer.MIN_VALUE;
@@ -204,16 +225,17 @@ public class ControlWarrior extends SampleGamer {
 		}
 
 		GamestateNode parent = stateNode.getParent();
-		return stateNode.getUtility() + Math.sqrt(2 * Math.log(parent.getVisits()) / (1 + stateNode.getVisits()));
+
+		// slightly modified eqn from lecture
+		return (stateNode.getUtility() / stateNode.getVisits()) + Math.sqrt(2 * Math.log(parent.getVisits()) / (1 + stateNode.getVisits()));
 	}
 
+	/* Expands out node tree from selectedNode. Works if selectedNode is
+	 * a partial or complete node.
+	 *
+	 * Adds children and links them to selectedNode.
+	 */
 	public void expand(GamestateNode selectedNode) throws MoveDefinitionException, TransitionDefinitionException {
-		// occurs if a node is selected that doesn't have a MachineState
-		if (!selectedNode.isValidState()) {
-			System.out.println("[ERROR] Didn't filter out non-valid states in expand()");
-			return;
-		}
-
 		MachineState selectedState = selectedNode.getState();
 		StateMachine game = getStateMachine();
 
@@ -221,26 +243,71 @@ public class ControlWarrior extends SampleGamer {
 			return;
 		}
 
-		List<Move> ourLegalMoves = game.getLegalMoves(selectedState, getRole());
+		boolean partialNode = !selectedNode.isValidState();
 
-		for (int i = 0; i < ourLegalMoves.size(); i++) {
-			GamestateNode newNode = new GamestateNode(selectedNode);
-			newNode.addPreviousMove(getRole(), ourLegalMoves.get(i));
-			selectedNode.addChild(newNode);
-			allNodes.add(newNode);
+		// behaves differently depending on whether node is a partial move or a full move
+		if (partialNode) {
+			List<List<Move>> legalMoves = game.getLegalJointMoves(selectedState, getRole(), selectedNode.getPreviousMove(getRole()));
 
-			List<List<Move>> jointLegalMoves = game.getLegalJointMoves(selectedState, getRole(), ourLegalMoves.get(i));
-			for (int j = 0; j < jointLegalMoves.size(); j++) {
-				List<Move> nextJointMove = jointLegalMoves.get(j);
-				MachineState nextState = game.findNext(nextJointMove, selectedState);
-				GamestateNode nextNewNode = new GamestateNode(newNode, nextState);
-				newNode.addChild(nextNewNode);
-				allNodes.add(nextNewNode);
-				stateToNode.put(nextState, nextNewNode);
+			// if all children have already been added, then no problem
+			// NOTE: this could be a problem if a few children are added but not all
+			if (legalMoves.size() == selectedNode.getChildren().size())
+				return;
+
+			for (int i = 0; i < legalMoves.size(); i++) {
+				MachineState nextState = game.findNext(legalMoves.get(i), selectedState);
+				GamestateNode nextNode = new GamestateNode(selectedNode, nextState);
+				selectedNode.addChild(nextNode);
+				allNodes.add(nextNode);
+				stateToNode.put(nextState, nextNode);
+			}
+		} else {
+			List<Move> ourLegalMoves = game.getLegalMoves(selectedState, getRole());
+
+			if (ourLegalMoves.size() == selectedNode.getChildren().size())
+				return;
+
+			for (int i = 0; i < ourLegalMoves.size(); i++) {
+				GamestateNode nextNode = new GamestateNode(selectedNode);
+				nextNode.addPreviousMove(getRole(), ourLegalMoves.get(i));
+				selectedNode.addChild(nextNode);
+				allNodes.add(nextNode);
 			}
 		}
 	}
 
+	/* Simulates [count] number of games from the starting node.
+	 *
+	 * Starting node can be a partial or complete state.
+	 */
+	public int simulate(GamestateNode selectedNode, int count) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+		StateMachine game = getStateMachine();
+		MachineState state = selectedNode.getState();
+
+		int total = 0;
+		for (int i = 0; i < count; i++) {
+			nDepthChargesTurn++;
+
+			if (!selectedNode.isValidState()) {
+				Move firstMove = selectedNode.getPreviousMove(getRole());
+				total = total + depthcharge(getRole(), firstMove, state);
+			} else {
+				total = total + depthcharge(getRole(), null, state);
+			}
+
+			if (System.currentTimeMillis() > finishBy) {
+				return total / (i + 1);
+			}
+		}
+
+		return total / count;
+	}
+
+	/* Runs back up the node tree and sets visits and utility.
+	 *
+	 * Argument: GamestateNode to start with
+	 * 			 utility value found in simulation
+	 */
 	public void propagate(GamestateNode selectedNode, int value) {
 		selectedNode.setVisits(selectedNode.getVisits() + 1);
 		selectedNode.setUtility(selectedNode.getUtility() + value);
@@ -248,18 +315,20 @@ public class ControlWarrior extends SampleGamer {
 			propagate(selectedNode.getParent(), value);
 	}
 
-	public int montecarlo(Role role, MachineState state, int count) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
-		int total = 0;
-		for(int i = 0; i < count; i++) {
-			total = total + depthcharge(role, state);
-		}
-		return total / count;
-	}
+	/* Simulates playing a game out to completion.
+	 *
+	 * Arguments: Role of player we want to play as (used to get reward at end)
+	 * 			  [OPTIONAL] First move for this player (used in partial states)
+	 * 					- if not used, pass in null
+	 * 			  MachineState corresponding to start of game
+	 */
 
-	public int depthcharge(Role role, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+	public int depthcharge(Role role, Move firstMove, MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
 		StateMachine game = getStateMachine();
+
+		// returns a neutral value if timed out
     	if (System.currentTimeMillis() > finishBy) {
-    		return mixedEvalFn(state);
+    		return 50;
     	}
 
 		if(game.isTerminal(state)) {
@@ -269,211 +338,120 @@ public class ControlWarrior extends SampleGamer {
 		List<Move> moves_to_sim = new ArrayList<Move>();
 
 		for(int i = 0; i < game.getRoles().size(); i++) {
-			List<Move> options = game.findLegals(game.getRoles().get(i), state);
-			moves_to_sim.add(options.get(r.nextInt(options.size())));
-		}
-		MachineState newState = game.findNext(moves_to_sim, state);
-		return depthcharge(role, newState);
-	}
+			Role nextRole = game.getRoles().get(i);
 
-	/*public double selectFn(MachineState state) {
-		if (state == null) {
-			System.out.println("[Error] Ran selectFn on a null state");
-			return 0;
-		}
-
-		MachineState parentNode = nodeParent.get(state);
-		if (parentNode == null) {
-			return 0;
-		}
-
-		return nodeUtility.get(state) + Math.sqrt(2 * Math.log(nodeVisits.get(parentNode)) / nodeVisits.get(state));
-	}*/
-
-	public int mixedEvalFn(MachineState state) {
-		// scores should be from 0 to 100
-		List<Integer> scores = new ArrayList<Integer>();
-		scores.add(evalOurMobility(state, true));
-		scores.add(evalOpponentMobility(state));
-		scores.add(evalGoalProximity(state));
-
-		// weights should add up to 1
-		List<Double> weights = new ArrayList<Double>();
-		weights.add(0.25);
-		weights.add(0.25);
-		weights.add(0.5);
-
-		double compositeScore = 0;
-		for (int i = 0; i < scores.size(); i++) {
-			compositeScore += scores.get(i) * weights.get(i);
-		}
-
-		return (int)compositeScore;
-	}
-
-	/* Heuristic function to evaluate a state based on our player's mobility.
-	 *
-	 * arguments : state that we are evaluating currently,
-	 *             whether or not we favor mobility (true) or focus (false)
-	 */
-	public int evalOurMobility(MachineState state, boolean favorMobility) {
-		StateMachine machine = getStateMachine();
-		int nLegalMoves, nMoves;
-
-		try {
-			nLegalMoves = machine.getLegalMoves(state, getRole()).size();
-			nMoves = machine.findActions(getRole()).size();
-		} catch (Exception e) {
-			e.printStackTrace();
-			return -1;
-		}
-
-		double percentageMobility = 0;
-
-		if (nMoves != 0)
-			percentageMobility = ((double) nLegalMoves) / nMoves * 100;
-
-		if (!favorMobility)
-			percentageMobility = 100 - percentageMobility;
-
-		return (int)percentageMobility;
-	}
-
-	/* Heuristic function to evaluate a state based on our opponent's mobility (less choices = better).
-	 * Should work for more than 2 player games as well (not tested).
-	 *
-	 * arguments: state that we are evaluating currently,
-	 */
-	public int evalOpponentMobility(MachineState state) {
-		StateMachine machine = getStateMachine();
-		int nLegalMoves = 0;
-		int nMoves = 0;
-
-		for (Role r : machine.findRoles()) {
-			if (r.equals(getRole())) continue;
-
-			try {
-				nLegalMoves += machine.getLegalMoves(state, r).size();
-				nMoves += machine.findActions(r).size();
-			} catch (Exception e) {
-				e.printStackTrace();
-				return -1;
-			}
-		}
-
-		double percentageMobility = 0;
-
-		if (nMoves != 0)
-			percentageMobility = 100 - (((double) nLegalMoves) / nMoves * 100);
-
-		return (int)percentageMobility;
-	}
-
-	/* Heuristic function to evaluate a state based on the GDL constraints.
-	 * Compares state to terminal states found in meta gaming.
-	 *
-	 * arguments: state that we are evaluating currently.
-	 */
-	public int evalGoalProximity(MachineState state) {
-		StateMachine game = getStateMachine();
-		// if no meta gaming was done or if not enough time was given in the metagame
-		if (goalCache.size() == 0) {
-			System.out.println("Cache was empty");
-			return 0;
-		}
-
-		Set<GdlSentence> currGdl = state.getContents();
-		double score = 0;
-
-		for (GdlSentence g : currGdl) {
-			List<GdlTerm> gdlStatements = g.getBody();
-			if (gdlStatements.size() < 1) continue;
-			String statement = gdlStatements.get(0).toString();
-
-			if (!goalCache.containsKey(statement)) {
+			// special case just to allow for partial states to be simulated
+			if (nextRole.equals(role) && firstMove != null) {
+				moves_to_sim.add(firstMove);
 				continue;
 			}
 
-			score += goalCache.get(statement);
-		}
+			List<Move> options = game.findLegals(nextRole, state);
 
-		score = (score / currGdl.size()) * 100;
-		//System.out.println("Score: " + score);
-		//System.out.println("-------------------------");
+			boolean foundWinningMove = false;
 
-		try {
-			score += game.getGoal(state, getRole());
-		} catch (Exception e) {
-			e.printStackTrace();
+			// looks to see if any roles have a winning move
+			for (int j = 0; j < options.size(); j++) {
+				List<List<Move>> possibleFutures = game.getLegalJointMoves(state, nextRole, options.get(j));
+
+				for (int k = 0; k < possibleFutures.size(); k++) {
+					MachineState futureState = game.findNext(possibleFutures.get(k), state);
+
+					if (game.isTerminal(futureState)) {
+						if (game.findReward(nextRole, futureState) == 100) {
+    						moves_to_sim.add(options.get(j));
+    						foundWinningMove = true;
+    						break;
+						}
+					}
+				}
+
+				if (foundWinningMove) break;
+			}
+
+			// if no role has a winning move, then just play random
+			if (!foundWinningMove)
+				moves_to_sim.add(options.get(r.nextInt(options.size())));
 		}
-		return (int)score;
+		MachineState newState = game.findNext(moves_to_sim, state);
+		return depthcharge(role, null, newState);
 	}
 
-	/* Simulates playing games during metagame period. When we reach a terminal state,
-	 * we look at the GDL statements and record it in the class variable goalCache.
-	 *
-	 * This is used in evalGoalProximity() as a heuristic.
+	/* Simulates playing games during metagame period. Counts number of games played
+	 * per second which is used while playing the game.
 	 */
 	@Override
 	public void stateMachineMetaGame(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException
     {
-        int nGamesPlayed = 0;
+        // clear variables from game to game
+		allNodes.clear();
+        stateToNode.clear();
+        nMetaGames = 0;
+        nDepthChargesGame = 0;
+
+		int nGamesPlayed = 0;
         StateMachine game = getStateMachine();
         finishBy = timeout - finishByTime;
         long totalTime = timeout - System.currentTimeMillis();
 
         while (true) {
-        	MachineState nextState = game.getInitialState();
+        	MachineState state = game.getInitialState();
 
         	if (System.currentTimeMillis() > finishBy)
         		break;
 
-        	boolean gameFinished = false;
-        	while(!gameFinished) {
+        	while(true) {
         		if (System.currentTimeMillis() > finishBy)
-            		gameFinished = true;
+            		break;
 
-        		if (game.isTerminal(nextState)) {
-        			// reached end of simulated game - time to update goalCache
-        			gameFinished = true;
+        		if (game.isTerminal(state)) {
         			nGamesPlayed++;
-        			if (game.findReward(getRole(), nextState) == 0) break;
-
-        			Set<GdlSentence> gdl = nextState.getContents();
-        			for (GdlSentence g : gdl) {
-        				List<GdlTerm> gdlStatements = g.getBody();
-        				if (gdlStatements.size() < 1) continue;
-        				String statement = gdlStatements.get(0).toString();
-
-        				if (!goalCache.containsKey(statement))
-        					goalCache.put(statement, 0.0);
-
-        				goalCache.put(statement, goalCache.get(statement) + 1);
-        			}
-
         			break;
         		}
 
-        		List<MachineState> possibleNextStates = game.getNextStates(nextState);
-        		nextState = (possibleNextStates.get(r.nextInt(possibleNextStates.size())));
+        		List<Move> moves_to_sim = new ArrayList<Move>();
+
+        		for(int i = 0; i < game.getRoles().size(); i++) {
+        			Role role = game.getRoles().get(i);
+        			List<Move> options = game.findLegals(role, state);
+
+        			boolean foundWinningMove = false;
+
+        			for (int j = 0; j < options.size(); j++) {
+        				List<List<Move>> possibleFutures = game.getLegalJointMoves(state, role, options.get(j));
+
+        				for (int k = 0; k < possibleFutures.size(); k++) {
+        					MachineState futureState = game.findNext(possibleFutures.get(k), state);
+
+        					if (game.isTerminal(futureState)) {
+        						if (game.findReward(role, futureState) == 100) {
+	        						moves_to_sim.add(options.get(j));
+	        						foundWinningMove = true;
+	        						break;
+        						}
+        					}
+        				}
+
+        				if (foundWinningMove) break;
+        			}
+
+        			if (!foundWinningMove)
+        				moves_to_sim.add(options.get(r.nextInt(options.size())));
+        		}
+        		state = game.findNext(moves_to_sim, state);
         	}
         }
 
         System.out.println("[META] We played: " + nGamesPlayed + " games in " + (totalTime / 1000) + " seconds.");
 
-        if (nGamesPlayed != 0) {
-        	for (String s : goalCache.keySet()) {
-        		double currentValue = goalCache.get(s);
-        		goalCache.put(s, currentValue / nGamesPlayed);
-        	}
-        }
-
+        // calculates nGames / second
         nMetaGames = nGamesPlayed;
         double gamesPerSecond = ((double) nMetaGames) / totalTime;
         gamesPerSecond *= 1000;
 
-        if (gamesPerSecond > 100) {
-        	nGamesPerSimulation = 25;
+        // arbitrary setting based on nGames / second
+        if (gamesPerSecond > 50) {
+        	nGamesPerSimulation = 50;
         } else if (gamesPerSecond > 10) {
         	nGamesPerSimulation = 10;
         } else if (gamesPerSecond > 5) {

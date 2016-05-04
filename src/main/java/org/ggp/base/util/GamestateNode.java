@@ -17,6 +17,8 @@ public class GamestateNode {
 	double utility;
 	int visits;
 
+	boolean shouldVisit;
+
 	MachineState state;
 	boolean isValidState;
 
@@ -26,6 +28,8 @@ public class GamestateNode {
 
 		children = new ArrayList<GamestateNode>();
 		previousMoves = new HashMap<Role, Move>();
+
+		shouldVisit = true;
 	}
 
 	public GamestateNode(GamestateNode parent, MachineState state) {
@@ -38,7 +42,7 @@ public class GamestateNode {
 	public GamestateNode(GamestateNode parent) {
 		init();
 		this.parent = parent;
-		state = null;
+		this.state = parent.getState();
 		isValidState = false;
 	}
 
@@ -56,6 +60,10 @@ public class GamestateNode {
 
 	public void setVisits(int updatedVisits) {
 		visits = updatedVisits;
+	}
+
+	public void markShouldVisit(boolean shouldVisitFlag) {
+		shouldVisit = shouldVisitFlag;
 	}
 
 	public double getUtility() {
@@ -92,5 +100,9 @@ public class GamestateNode {
 
 	public boolean isValidState() {
 		return isValidState;
+	}
+
+	public boolean shouldVisit() {
+		return shouldVisit;
 	}
 }
