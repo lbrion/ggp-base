@@ -348,6 +348,12 @@ public class ControlWarrior extends SampleGamer {
 
 			List<Move> options = game.findLegals(nextRole, state);
 
+			// saves time if we only have one option
+			if (options.size() == 1) {
+				moves_to_sim.add(options.get(0));
+				continue;
+			}
+
 			boolean foundWinningMove = false;
 
 			// looks to see if any roles have a winning move
@@ -363,6 +369,33 @@ public class ControlWarrior extends SampleGamer {
     						foundWinningMove = true;
     						break;
 						}
+					} else {
+						// this part is for Pentago and other games where a role
+						// moves twice in a row
+						List<Move> futureOptions = game.findLegals(nextRole, futureState);
+						if (futureOptions.size() == 1 && futureOptions.get(0).toString().equals("noop")) {
+							continue;
+						} else {
+							for (int x = 0; x < futureOptions.size(); x++) {
+								List<List<Move>> possibleFutureFutures = game.getLegalJointMoves(futureState, nextRole, futureOptions.get(x));
+
+								for (int y = 0; y < possibleFutureFutures.size(); y++) {
+									MachineState futureFutureState = game.findNext(possibleFutureFutures.get(y), futureState);
+
+									if (game.isTerminal(futureFutureState)) {
+										if (game.findReward(nextRole, futureFutureState) == 100) {
+				    						moves_to_sim.add(options.get(j));
+				    						foundWinningMove = true;
+				    						break;
+										}
+									}
+								}
+
+								if (foundWinningMove) break;
+							}
+						}
+
+						if (foundWinningMove) break;
 					}
 				}
 
@@ -414,6 +447,11 @@ public class ControlWarrior extends SampleGamer {
         		for(int i = 0; i < game.getRoles().size(); i++) {
         			Role role = game.getRoles().get(i);
         			List<Move> options = game.findLegals(role, state);
+
+        			if (options.size() == 1) {
+        				moves_to_sim.add(options.get(0));
+        				continue;
+        			}
 
         			boolean foundWinningMove = false;
 
