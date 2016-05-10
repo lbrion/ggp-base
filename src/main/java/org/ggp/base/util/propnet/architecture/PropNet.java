@@ -17,6 +17,7 @@ import org.ggp.base.util.gdl.grammar.GdlSentence;
 import org.ggp.base.util.gdl.grammar.GdlTerm;
 import org.ggp.base.util.logging.GamerLogger;
 import org.ggp.base.util.propnet.architecture.components.And;
+import org.ggp.base.util.propnet.architecture.components.Constant;
 import org.ggp.base.util.propnet.architecture.components.Not;
 import org.ggp.base.util.propnet.architecture.components.Or;
 import org.ggp.base.util.propnet.architecture.components.Proposition;
@@ -327,6 +328,9 @@ public final class PropNet
     			c.setType("or");
     		} else if (c instanceof Not) {
     			c.setType("not");
+    		} else if (c instanceof Constant) {
+    			System.out.println("!");
+    			c.setType("constant");
     		}
     	}
     }
@@ -364,12 +368,8 @@ public final class PropNet
 		    		}
 
 		    		if (foundConnective) {
-		    			if (!p.getName().toString().equals("anon")) {
-		    				p.setType("view");
-		    				viewPropositions.put(p.getName(), p);
-		    			} else {
-		    				p.setType("anon - not sure???");
-		    			}
+		    			p.setType("view");
+		    			viewPropositions.put(p.getName(), p);
 		    		}
     			}
     		}

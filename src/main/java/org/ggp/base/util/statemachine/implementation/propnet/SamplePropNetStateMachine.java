@@ -130,14 +130,20 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public List<Move> getLegalMoves(MachineState state, Role role)
             throws MoveDefinitionException {
+    	markBases(state);
+    	System.out.println(propNet.getLegalPropositions().size());
+
         // TODO: Compute legal moves.
     	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
     	List<Move> legalMoves = new ArrayList<Move>();
 
     	for (Proposition p : legalProps) {
+    		System.out.println("------------");
     		if (markProposition(p)) {
     			Move m = new Move(p.getName().get(1));
     			legalMoves.add(m);
+
+    			System.out.println("------------");
     		}
     	}
 
@@ -155,9 +161,6 @@ public class SamplePropNetStateMachine extends StateMachine {
     	markBases(state);
 
     	for (Proposition p : propNet.getPropositions()) {
-    		if (p.getType().equals("base") || p.getType().equals("input"))
-    			continue;
-
     		markProposition(p);
     	}
 
@@ -206,20 +209,9 @@ public class SamplePropNetStateMachine extends StateMachine {
     	String type = c.getType();
     	//System.out.println(type);
 
-    	/*if (type.equals("base")) return c.getValue();
-    	else if (type.equals("does")) return c.getValue();
-    	else if (type.equals("view")) {
-    		System.out.println(c.getInputs().size());
-    		return markProposition(c.getSingleInput());
-    	}
-    	else if (type.equals("logic")) return c.getValue();
-    	else if (type.equals("anon - not sure???")) {
-    		System.out.println("rip I give up");
-    		return true;
-    	}*/
-
-    	if (type.equals("view")) {
-    		System.out.println(c.getInputs().size());
+    	if (type.equals("input") || type.equals("base")) {
+    		return c.getValue();
+    	} else if (type.equals("view")) {
     		return markProposition(c.getSingleInput());
     	} else if (type.equals("not")) {
     		return !markProposition(c.getSingleInput());
@@ -237,11 +229,12 @@ public class SamplePropNetStateMachine extends StateMachine {
     			if (nextVal) { oneTrue = true; break; }
     		}
     		return oneTrue;
-    	} else if (type.equals("anon - not sure???")) {
-    		System.out.println("rip I give up");
-    		return true;
+    	} else if (type.equals("legal") || type.equals("terminal") || type.equals("goal") ||
+    			type.equals("init") || type.equals("does") || type.equals("not set") || type.equals("constant")) {
+    		if (c.getInputs().size() == 0) return c.getValue();
+    		else return markProposition(c.getSingleInput());
     	} else {
-    		//System.out.println(c.getClass().getName());
+    		System.out.println("WHAT IS THIS??? " + c.getType());
     		return c.getValue();
     	}
     }
