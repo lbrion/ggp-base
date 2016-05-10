@@ -42,6 +42,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public void initialize(List<Gdl> description) {
         try {
+        	System.out.println("Going up");
             propNet = OptimizingPropNetFactory.create(description);
             roles = propNet.getRoles();
             ordering = getOrdering();
@@ -96,6 +97,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public MachineState getInitialState() {
         // TODO: Compute the initial state.
+    	System.out.println("Getting initial state");
     	Proposition initProp = propNet.getInitProposition();
         initProp.setValue(true);
 
@@ -137,13 +139,13 @@ public class SamplePropNetStateMachine extends StateMachine {
     	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
     	List<Move> legalMoves = new ArrayList<Move>();
 
+		System.out.println("Legal Moves:");
     	for (Proposition p : legalProps) {
-    		System.out.println("------------");
     		if (markProposition(p)) {
     			Move m = new Move(p.getName().get(1));
     			legalMoves.add(m);
 
-    			System.out.println("------------");
+    			System.out.println(m);
     		}
     	}
 
@@ -157,13 +159,19 @@ public class SamplePropNetStateMachine extends StateMachine {
     public MachineState getNextState(MachineState state, List<Move> moves)
             throws TransitionDefinitionException {
         // TODO: Compute the next state.
+    	// FIXME: We need to do something to state here with moves before we mark bases.
     	markActions(moves);
     	markBases(state);
+    	System.out.println("I'm trying to go to the next state");
+    	System.out.println("First state:");
 
+        System.out.println(getStateFromBase());
     	for (Proposition p : propNet.getPropositions()) {
     		markProposition(p);
     	}
 
+    	System.out.println("Final state:");
+        System.out.println(getStateFromBase());
         return getStateFromBase();
     }
 
@@ -241,9 +249,17 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     private void markBases(MachineState state) {
     	Set<GdlSentence> stateGDL = state.getContents();
+
+    	System.out.println("State GDL:");
+    	for(GdlSentence x : stateGDL) {
+    		System.out.println(x);
+    	}
+
     	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
+    	System.out.println("All GDL:");
 
     	for (GdlSentence gdl : baseProps.keySet()) {
+    		System.out.println(gdl);
     		if (stateGDL.contains(gdl)) {
     			baseProps.get(gdl).setValue(true);
     		} else {
@@ -256,7 +272,7 @@ public class SamplePropNetStateMachine extends StateMachine {
      * It uses a new auxillary data structure that I added
      */
     private void markActions(List<Move> actions) {
-    	Map<String, Proposition> baseProps = propNet.getMoveToProp();
+    	Map<GdlSentence, Proposition> baseProps = propNet.getInputPropositions();
 
     	for(int i = 0; i < actions.size(); i++) {
     		Role nextRole = roles.get(i);

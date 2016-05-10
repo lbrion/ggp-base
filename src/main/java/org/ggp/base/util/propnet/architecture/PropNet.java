@@ -86,7 +86,7 @@ public final class PropNet
     private final Map<GdlSentence, Proposition> inputPropositions;
 
     // Pyul's own inputProp structure
-    private final Map<String, Proposition> moveToProp;
+    private Map<String, Proposition> moveToProp;
 
     /** References to every LegalProposition in the PropNet, indexed by role. */
     private final Map<Role, Set<Proposition>> legalPropositions;
@@ -232,6 +232,11 @@ public final class PropNet
     public Map<String, Proposition> getMoveToProp()
     {
     	return moveToProp;
+    }
+
+    public void setMoveToProp(Map<String, Proposition> newMoveToProp)
+    {
+    	moveToProp = newMoveToProp;
     }
 
     /**

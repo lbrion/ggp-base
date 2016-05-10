@@ -18,7 +18,7 @@ public class MiracleRogue extends SampleGamer {
 
 	@Override
 	public String getName() {
-        return "Miracle Rogue";
+        return "MiracleRogue";
     }
 
 	@Override
@@ -27,7 +27,6 @@ public class MiracleRogue extends SampleGamer {
 		StateMachine game = getStateMachine();
         long start = System.currentTimeMillis();
         //long finishBy = timeout - 1000;
-
         List<Move> actions = game.findLegals(getRole(), getCurrentState());
         System.out.println(actions);
 
