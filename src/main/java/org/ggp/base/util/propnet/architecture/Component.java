@@ -18,6 +18,7 @@ public abstract class Component implements Serializable
     private final Set<Component> inputs;
     /** The outputs of the component. */
     private final Set<Component> outputs;
+    private String type;
 
     /**
      * Creates a new Component with no inputs or outputs.
@@ -26,6 +27,15 @@ public abstract class Component implements Serializable
     {
         this.inputs = new HashSet<Component>();
         this.outputs = new HashSet<Component>();
+        type = "not set";
+    }
+
+    public String getType() {
+    	return type;
+    }
+
+    public void setType(String newType) {
+    	type = newType;
     }
 
     /**

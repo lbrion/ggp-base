@@ -73,12 +73,19 @@ public final class PropNet
 
     /** References to every Proposition in the PropNet. */
     private final Set<Proposition> propositions;
+    private final Set<And> ands;
+    private final Set<Or> ors;
+    private final Set<Transition> transitions;
 
+    private final Map<GdlSentence, Proposition> viewPropositions;
     /** References to every BaseProposition in the PropNet, indexed by name. */
     private final Map<GdlSentence, Proposition> basePropositions;
 
     /** References to every InputProposition in the PropNet, indexed by name. */
     private final Map<GdlSentence, Proposition> inputPropositions;
+
+    // Pyul's own inputProp structure
+    private final Map<String, Proposition> moveToProp;
 
     /** References to every LegalProposition in the PropNet, indexed by role. */
     private final Map<Role, Set<Proposition>> legalPropositions;
@@ -102,6 +109,10 @@ public final class PropNet
     {
         components.add(c);
         if (c instanceof Proposition) propositions.add((Proposition)c);
+        else if (c instanceof And) ands.add((And)c);
+        else if (c instanceof Or) ors.add((Or)c);
+        else if (c instanceof Transition) transitions.add((Transition)c);
+        else System.out.println("[addComponent] weird instance object");
     }
 
     /**
@@ -113,10 +124,12 @@ public final class PropNet
      */
     public PropNet(List<Role> roles, Set<Component> components)
     {
-
+    	this.moveToProp = new HashMap<String, Proposition>();
         this.roles = roles;
         this.components = components;
         this.propositions = recordPropositions();
+        this.ands = new HashSet<And>();
+        this.ors = new HashSet<Or>();
         this.basePropositions = recordBasePropositions();
         this.inputPropositions = recordInputPropositions();
         this.legalPropositions = recordLegalPropositions();
@@ -124,6 +137,9 @@ public final class PropNet
         this.initProposition = recordInitProposition();
         this.terminalProposition = recordTerminalProposition();
         this.legalInputMap = makeLegalInputMap();
+        this.viewPropositions = recordViewPropositions();
+        this.transitions = recordTransitions();
+        recordAndOrNot();
     }
 
     public List<Role> getRoles()
@@ -212,6 +228,11 @@ public final class PropNet
         return inputPropositions;
     }
 
+    public Map<String, Proposition> getMoveToProp()
+    {
+    	return moveToProp;
+    }
+
     /**
      * Getter method.
      *
@@ -231,6 +252,21 @@ public final class PropNet
     public Set<Proposition> getPropositions()
     {
         return propositions;
+    }
+
+    public Set<Or> getOrs()
+    {
+        return ors;
+    }
+
+    public Set<And> getAnds()
+    {
+        return ands;
+    }
+
+    public Set<Transition> getTransitions()
+    {
+        return transitions;
     }
 
     /**
@@ -282,6 +318,66 @@ public final class PropNet
         }
     }
 
+    // yay and/or/not is marked as a type
+    private void recordAndOrNot() {
+    	for (Component c : components) {
+    		if (c instanceof And) {
+    			c.setType("and");
+    		} else if (c instanceof Or) {
+    			c.setType("or");
+    		} else if (c instanceof Not) {
+    			c.setType("not");
+    		}
+    	}
+    }
+
+    // this fn is useless atm
+    private Set<Transition> recordTransitions() {
+    	Set<Transition> transitions = new HashSet<Transition>();
+
+    	for (Component c : components) {
+    		if (c instanceof Transition) {
+    			c.setType("transition");
+    		}
+    	}
+
+    	return transitions;
+    }
+
+    /* I added this to find view propositions
+     *
+     */
+
+    private Map<GdlSentence, Proposition> recordViewPropositions() {
+    	Map<GdlSentence, Proposition> viewPropositions = new HashMap<GdlSentence, Proposition>();
+    	for (Component c : components) {
+    		if (c instanceof Proposition) {
+    			Proposition p = (Proposition) c;
+
+    			if (p.getType().equals("not set")) {
+	    			boolean foundConnective = false;
+		    		for (Component inputs : c.getInputs()) {
+		    			if (inputs instanceof And || inputs instanceof Or || inputs instanceof Not) {
+		    				foundConnective = true;
+		    				break;
+		    			}
+		    		}
+
+		    		if (foundConnective) {
+		    			if (!p.getName().toString().equals("anon")) {
+		    				p.setType("view");
+		    				viewPropositions.put(p.getName(), p);
+		    			} else {
+		    				p.setType("anon - not sure???");
+		    			}
+		    		}
+    			}
+    		}
+    	}
+
+    	return viewPropositions;
+    }
+
     /**
      * Builds an index over the BasePropositions in the PropNet.
      *
@@ -301,6 +397,7 @@ public final class PropNet
 
             Component component = proposition.getSingleInput();
             if (component instanceof Transition) {
+            	proposition.setType("base");
                 basePropositions.put(proposition.getName(), proposition);
             }
         }
@@ -331,6 +428,8 @@ public final class PropNet
             if (!relation.getName().getValue().equals("goal"))
                 continue;
 
+            proposition.setType("goal");
+
             Role theRole = new Role((GdlConstant) relation.get(0));
             if (!goalPropositions.containsKey(theRole)) {
                 goalPropositions.put(theRole, new HashSet<Proposition>());
@@ -356,6 +455,7 @@ public final class PropNet
 
             GdlConstant constant = ((GdlProposition) proposition.getName()).getName();
             if (constant.getValue().toUpperCase().equals("INIT")) {
+            	proposition.setType("init");
                 return proposition;
             }
         }
@@ -378,7 +478,17 @@ public final class PropNet
 
             GdlRelation relation = (GdlRelation) proposition.getName();
             if (relation.getName().getValue().equals("does")) {
+            	proposition.setType("does");
                 inputPropositions.put(proposition.getName(), proposition);
+
+                List<GdlTerm> body = proposition.getName().getBody();
+                String key = body.get(0).toString();
+
+                for (int i = 1; i < body.size(); i++) {
+                	key += "|" + body.get(i).toString();
+                }
+
+                moveToProp.put(key, proposition);
             }
         }
 
@@ -401,6 +511,8 @@ public final class PropNet
 
             GdlRelation relation = (GdlRelation) proposition.getName();
             if (relation.getName().getValue().equals("legal")) {
+            	proposition.setType("legal");
+
                 GdlConstant name = (GdlConstant) relation.get(0);
                 Role r = new Role(name);
                 if (!legalPropositions.containsKey(r)) {
@@ -444,7 +556,8 @@ public final class PropNet
                 GdlConstant constant = ((GdlProposition) proposition.getName()).getName();
                 if ( constant.getValue().equals("terminal") )
                 {
-                    return proposition;
+                    proposition.setType("terminal");
+                	return proposition;
                 }
             }
         }

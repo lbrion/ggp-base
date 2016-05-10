@@ -56,8 +56,8 @@ public class SamplePropNetStateMachine extends StateMachine {
      */
     @Override
     public boolean isTerminal(MachineState state) {
-        // TODO: Compute whether the MachineState is terminal.
-        return false;
+    	markBases(state);
+        return propNet.getTerminalProposition().getValue();
     }
 
     /**
@@ -71,7 +71,21 @@ public class SamplePropNetStateMachine extends StateMachine {
     public int getGoal(MachineState state, Role role)
             throws GoalDefinitionException {
         // TODO: Compute the goal for role in state.
-        return -1;
+    	Set<Proposition> goalProps = propNet.getGoalPropositions().get(role);
+    	int goalReward = 0;
+    	boolean foundTrue = false;
+
+    	for (Proposition p : goalProps) {
+    		if (p.getValue()) {
+    			goalReward = getGoalValue(p);
+    			foundTrue = true;
+    		}
+    	}
+
+    	if (!foundTrue)
+    		throw new GoalDefinitionException(state, role);
+
+        return goalReward;
     }
 
     /**
@@ -82,7 +96,14 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public MachineState getInitialState() {
         // TODO: Compute the initial state.
-        return null;
+    	Proposition initProp = propNet.getInitProposition();
+        initProp.setValue(true);
+
+    	for (Proposition nextProp : propNet.getBasePropositions().values()) {
+    		markProposition(nextProp);
+    	}
+
+    	return getStateFromBase();
     }
 
     /**
@@ -92,7 +113,15 @@ public class SamplePropNetStateMachine extends StateMachine {
     public List<Move> findActions(Role role)
             throws MoveDefinitionException {
         // TODO: Compute legal moves.
-        return null;
+    	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
+    	List<Move> allMoves = new ArrayList<Move>();
+
+    	for (Proposition p : legalProps) {
+    		Move m = new Move(p.getName().get(1));
+    		allMoves.add(m);
+    	}
+
+        return allMoves;
     }
 
     /**
@@ -102,7 +131,17 @@ public class SamplePropNetStateMachine extends StateMachine {
     public List<Move> getLegalMoves(MachineState state, Role role)
             throws MoveDefinitionException {
         // TODO: Compute legal moves.
-        return null;
+    	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
+    	List<Move> legalMoves = new ArrayList<Move>();
+
+    	for (Proposition p : legalProps) {
+    		if (markProposition(p)) {
+    			Move m = new Move(p.getName().get(1));
+    			legalMoves.add(m);
+    		}
+    	}
+
+        return legalMoves;
     }
 
     /**
@@ -112,7 +151,17 @@ public class SamplePropNetStateMachine extends StateMachine {
     public MachineState getNextState(MachineState state, List<Move> moves)
             throws TransitionDefinitionException {
         // TODO: Compute the next state.
-        return null;
+    	markActions(moves);
+    	markBases(state);
+
+    	for (Proposition p : propNet.getPropositions()) {
+    		if (p.getType().equals("base") || p.getType().equals("input"))
+    			continue;
+
+    		markProposition(p);
+    	}
+
+        return getStateFromBase();
     }
 
     /**
@@ -152,6 +201,91 @@ public class SamplePropNetStateMachine extends StateMachine {
     }
 
     /* Helper methods */
+
+    private boolean markProposition(Component c) {
+    	String type = c.getType();
+    	//System.out.println(type);
+
+    	/*if (type.equals("base")) return c.getValue();
+    	else if (type.equals("does")) return c.getValue();
+    	else if (type.equals("view")) {
+    		System.out.println(c.getInputs().size());
+    		return markProposition(c.getSingleInput());
+    	}
+    	else if (type.equals("logic")) return c.getValue();
+    	else if (type.equals("anon - not sure???")) {
+    		System.out.println("rip I give up");
+    		return true;
+    	}*/
+
+    	if (type.equals("view")) {
+    		System.out.println(c.getInputs().size());
+    		return markProposition(c.getSingleInput());
+    	} else if (type.equals("not")) {
+    		return !markProposition(c.getSingleInput());
+    	} else if (type.equals("and")) {
+    		boolean oneFalse = false;
+    		for (Component nextComp : c.getInputs()) {
+    			boolean nextVal = markProposition(nextComp);
+    			if (!nextVal) { oneFalse = true; break; }
+    		}
+    		return !oneFalse;
+    	} else if (type.equals("or")) {
+    		boolean oneTrue = false;
+    		for (Component nextComp : c.getInputs()) {
+    			boolean nextVal = markProposition(nextComp);
+    			if (nextVal) { oneTrue = true; break; }
+    		}
+    		return oneTrue;
+    	} else if (type.equals("anon - not sure???")) {
+    		System.out.println("rip I give up");
+    		return true;
+    	} else {
+    		//System.out.println(c.getClass().getName());
+    		return c.getValue();
+    	}
+    }
+
+    private void markBases(MachineState state) {
+    	Set<GdlSentence> stateGDL = state.getContents();
+    	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
+
+    	for (GdlSentence gdl : baseProps.keySet()) {
+    		if (stateGDL.contains(gdl)) {
+    			baseProps.get(gdl).setValue(true);
+    		} else {
+    			baseProps.get(gdl).setValue(false);
+    		}
+    	}
+    }
+
+    /* Note: this function looks good for now
+     * It uses a new auxillary data structure that I added
+     */
+    private void markActions(List<Move> actions) {
+    	Map<String, Proposition> baseProps = propNet.getMoveToProp();
+
+    	for(int i = 0; i < actions.size(); i++) {
+    		Role nextRole = roles.get(i);
+    		Move m = actions.get(i);
+
+    		String concat = nextRole.toString() + "|" + m.toString();
+    		if (baseProps.get(concat) == null) {
+    			System.out.println("[markActions] Not found in moveToProp??");
+    			continue;
+    		}
+
+    		baseProps.get(concat).setValue(true);
+    	}
+    }
+
+    private void clearPropnet() {
+    	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
+    	for (GdlSentence gdl : baseProps.keySet()) {
+    		baseProps.get(gdl).setValue(false);
+    	}
+    }
+
 
     /**
      * The Input propositions are indexed by (does ?player ?action).

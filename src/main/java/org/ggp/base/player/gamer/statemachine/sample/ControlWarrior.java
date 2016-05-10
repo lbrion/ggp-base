@@ -281,7 +281,6 @@ public class ControlWarrior extends SampleGamer {
 	 * Starting node can be a partial or complete state.
 	 */
 	public int simulate(GamestateNode selectedNode, int count) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
-		StateMachine game = getStateMachine();
 		MachineState state = selectedNode.getState();
 
 		int total = 0;
