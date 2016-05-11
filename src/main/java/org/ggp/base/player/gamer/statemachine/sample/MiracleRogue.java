@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Random;
 
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
-import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.StateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
@@ -44,6 +43,5 @@ public class MiracleRogue extends SampleGamer {
     {
         //int nGamesPlayed = 0;
         StateMachine game = getStateMachine();
-        MachineState initState = game.getInitialState();
     }
 }

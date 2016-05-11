@@ -132,7 +132,7 @@ public class ControlWarrior extends SampleGamer {
     }
 
 	public boolean mcts(GamestateNode stateNode) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
-		//System.out.println("Starting mcts! " + allNodes.size());
+		System.out.println("Starting mcts! " + allNodes.size());
 
 		// selection
 		GamestateNode selectedNode = select(stateNode);

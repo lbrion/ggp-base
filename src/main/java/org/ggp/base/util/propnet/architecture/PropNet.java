@@ -324,7 +324,7 @@ public final class PropNet
         }
     }
 
-    // yay and/or/not is marked as a type
+    // and/or/not/constant is marked as a type
     private void recordAndOrNot() {
     	for (Component c : components) {
     		if (c instanceof And) {
@@ -339,7 +339,6 @@ public final class PropNet
     	}
     }
 
-    // this fn is useless atm
     private Set<Transition> recordTransitions() {
     	Set<Transition> transitions = new HashSet<Transition>();
 

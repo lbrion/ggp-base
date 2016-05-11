@@ -75,6 +75,6 @@ public final class Proposition extends Component
     @Override
     public String toString()
     {
-        return toDot("circle", value ? "red" : "white", name.toString());
+    	return toDot("circle", value ? "red" : "white", name.toString());
     }
 }

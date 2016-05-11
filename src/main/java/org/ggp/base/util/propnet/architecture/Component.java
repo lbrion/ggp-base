@@ -19,6 +19,7 @@ public abstract class Component implements Serializable
     /** The outputs of the component. */
     private final Set<Component> outputs;
     private String type;
+    private boolean isCorrect;
 
     /**
      * Creates a new Component with no inputs or outputs.
@@ -28,6 +29,7 @@ public abstract class Component implements Serializable
         this.inputs = new HashSet<Component>();
         this.outputs = new HashSet<Component>();
         type = "not set";
+        isCorrect = false;
     }
 
     public String getType() {
@@ -130,6 +132,15 @@ public abstract class Component implements Serializable
      * @return The value of the Component.
      */
     public abstract boolean getValue();
+
+    // these fns are meant to allow for caching
+    public boolean isCorrect() {
+    	return isCorrect;
+    }
+
+    public void setIsCorrect (boolean isNowCorrect) {
+    	isCorrect = isNowCorrect;
+    }
 
     /**
      * Returns a representation of the Component in .dot format.
