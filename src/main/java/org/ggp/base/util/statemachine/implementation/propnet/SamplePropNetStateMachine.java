@@ -79,6 +79,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     		if (p.getValue()) {
     			goalReward = getGoalValue(p);
     			foundTrue = true;
+    			break;
     		}
     	}
 
