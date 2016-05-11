@@ -42,7 +42,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public void initialize(List<Gdl> description) {
         try {
-            propNet = OptimizingPropNetFactory.create(description);
+            propNet = OptimizingPropNetFactory.create(description, true);
+            OptimizingPropNetFactory.removeAnonymousPropositions(propNet);
             roles = propNet.getRoles();
             ordering = getOrdering();
         } catch (InterruptedException e) {
@@ -97,13 +98,10 @@ public class SamplePropNetStateMachine extends StateMachine {
     public MachineState getInitialState() {
         // TODO: Compute the initial state.
     	System.out.println("Getting initial state");
-    	for (Proposition p : propNet.getPropositions()) {
-        	p.setValue(false);
-        }
 
     	Proposition initProp = propNet.getInitProposition();
     	initProp.setValue(true);
-        initProp.setValue(markProposition(initProp));
+    	propNet.renderToFile("ghi.dot");
     	return getStateFromBase();
     }
 
@@ -173,7 +171,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     		p.setValue(newVal);
 
     		if (oldVal != newVal) {
-    			System.out.println(p.getName() + " changed (" + oldVal + " -> " + newVal + ")");
+    			//System.out.println(p.getName() + " changed (" + oldVal + " -> " + newVal + ")");
     		}
     	}
 
@@ -189,6 +187,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     			System.out.println("Now it is: " + newVal);
     			System.out.println(p.getSingleInput().getValue());
     			System.out.println();
+    		} else {
+    			System.out.println(p.getName() + " is still " + oldVal);
     		}
 
     		GdlSentence pSentence = p.getName();
@@ -290,17 +290,6 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     /* Helper methods */
 
-    private boolean propagate(Component c) {
-    	if (c.getInputs().size() == 0)
-    		return c.getValue();
-
-    	for (Component nextInput : c.getInputs()) {
-    		propagate(nextInput);
-    	}
-
-    	return markProposition(c);
-    }
-
     private boolean markProposition(Component c) {
     	String type = c.getType();
     	//System.out.println(type);
@@ -312,19 +301,17 @@ public class SamplePropNetStateMachine extends StateMachine {
     	} else if (type.equals("not")) {
     		return !markProposition(c.getSingleInput());
     	} else if (type.equals("and")) {
-    		boolean oneFalse = false;
     		for (Component nextComp : c.getInputs()) {
     			boolean nextVal = markProposition(nextComp);
-    			if (!nextVal) { oneFalse = true; break; }
+    			if (!nextVal) { return false; }
     		}
-    		return !oneFalse;
+    		return true;
     	} else if (type.equals("or")) {
-    		boolean oneTrue = false;
     		for (Component nextComp : c.getInputs()) {
     			boolean nextVal = markProposition(nextComp);
-    			if (nextVal) { oneTrue = true; break; }
+    			if (nextVal) { return true; }
     		}
-    		return oneTrue;
+    		return false;
     	} else if (type.equals("legal")) {
     		return markProposition(c.getSingleInput());
     	} else if (type.equals("terminal") || type.equals("goal") ||
