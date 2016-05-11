@@ -97,13 +97,12 @@ public class SamplePropNetStateMachine extends StateMachine {
     public MachineState getInitialState() {
         // TODO: Compute the initial state.
     	System.out.println("Getting initial state");
+    	for (Proposition p : propNet.getPropositions()) {
+        	p.setValue(false);
+        }
+
     	Proposition initProp = propNet.getInitProposition();
-        initProp.setValue(true);
-
-    	/*for (Proposition nextProp : propNet.getBasePropositions().values()) {
-    		nextProp.setValue(markProposition(nextProp));
-    	}*/
-
+    	initProp.setValue(true);
         initProp.setValue(markProposition(initProp));
     	return getStateFromBase();
     }
@@ -114,6 +113,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public List<Move> findActions(Role role)
             throws MoveDefinitionException {
+    	System.out.println("Finding actions.");
         // TODO: Compute legal moves.
     	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
     	List<Move> allMoves = new ArrayList<Move>();
@@ -166,35 +166,46 @@ public class SamplePropNetStateMachine extends StateMachine {
     	System.out.println("First state:");
 
         System.out.println(getStateFromBase());
-    	/*for (int i = ordering.size() - 1; i >= 0; i--) {
+    	for (int i = 0; i < ordering.size(); i++) {
     		Proposition p = ordering.get(i);
-
     		boolean oldVal = p.getValue();
     		boolean newVal = markProposition(p);
     		p.setValue(newVal);
 
     		if (oldVal != newVal) {
-    			System.out.println(p.getName().toString() + " value = " + oldVal);
-    			System.out.println("Now it is: " + newVal);
-    			System.out.println();
+    			System.out.println(p.getName() + " changed (" + oldVal + " -> " + newVal + ")");
     		}
-    	}*/
+    	}
 
+        Set<GdlSentence> contents = state.getContents();
     	for (Proposition p : propNet.getBasePropositions().values()) {
     		boolean oldVal = p.getValue();
     		boolean newVal = markProposition(p.getSingleInput().getSingleInput());
     		p.setValue(newVal);
 
     		if (oldVal != newVal) {
-    			System.out.println(p.getName().toString() + " value = " + oldVal);
-    			System.out.println("!!!Now it is: " + newVal);
     			System.out.println();
+    			System.out.println(p.getName().toString() + " value = " + oldVal);
+    			System.out.println("Now it is: " + newVal);
+    			System.out.println(p.getSingleInput().getValue());
+    			System.out.println();
+    		}
+
+    		GdlSentence pSentence = p.getName();
+    		if (oldVal && !newVal) {
+    			contents.remove(pSentence);
+    		} else if (!oldVal && newVal) {
+    			contents.add(pSentence);
     		}
     	}
 
+    	MachineState nextState = new MachineState(contents);
     	System.out.println("Final state:");
-        System.out.println(getStateFromBase());
-        return getStateFromBase();
+        System.out.println(nextState);
+    	return nextState;
+    	//System.out.println("Final state:");
+        //System.out.println(getStateFromBase());
+        //return getStateFromBase();
     }
 
     /**
@@ -279,11 +290,22 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     /* Helper methods */
 
+    private boolean propagate(Component c) {
+    	if (c.getInputs().size() == 0)
+    		return c.getValue();
+
+    	for (Component nextInput : c.getInputs()) {
+    		propagate(nextInput);
+    	}
+
+    	return markProposition(c);
+    }
+
     private boolean markProposition(Component c) {
     	String type = c.getType();
     	//System.out.println(type);
 
-    	if (type.equals("input") || type.equals("base") || type.equals("constant") || type.equals("transition")) {
+    	if (type.equals("input") || type.equals("base") || type.equals("constant")) {
     		return c.getValue();
     	} else if (type.equals("view")) {
     		return markProposition(c.getSingleInput());
@@ -303,12 +325,14 @@ public class SamplePropNetStateMachine extends StateMachine {
     			if (nextVal) { oneTrue = true; break; }
     		}
     		return oneTrue;
-    	} else if (type.equals("legal") || type.equals("terminal") || type.equals("goal") ||
-    			type.equals("init") || type.equals("does") || type.equals("not set")) {
+    	} else if (type.equals("legal")) {
+    		return markProposition(c.getSingleInput());
+    	} else if (type.equals("terminal") || type.equals("goal") ||
+    			type.equals("init") || type.equals("does") || type.equals("not set") || type.equals("transition")) {
     		if (c.getInputs().size() == 0) return c.getValue();
     		else return markProposition(c.getSingleInput());
     	} else {
-    		System.out.println("WHAT IS THIS??? " + c.getType());
+    		System.out.println("[markProposition] Unknown component type: " + c.getType());
     		return c.getValue();
     	}
     }

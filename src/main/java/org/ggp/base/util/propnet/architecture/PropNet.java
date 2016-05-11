@@ -346,6 +346,7 @@ public final class PropNet
     	for (Component c : components) {
     		if (c instanceof Transition) {
     			c.setType("transition");
+    			transitions.add((Transition)c);
     		}
     	}
 
