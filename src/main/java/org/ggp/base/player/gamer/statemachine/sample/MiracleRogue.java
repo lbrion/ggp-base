@@ -28,7 +28,7 @@ public class MiracleRogue extends SampleGamer {
         long start = System.currentTimeMillis();
         //long finishBy = timeout - 1000;
         List<Move> actions = game.findLegals(getRole(), getCurrentState());
-        System.out.println(actions);
+        //System.out.println(actions);
 
         Move selection = (actions.get(r.nextInt(actions.size())));
 

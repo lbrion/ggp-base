@@ -334,7 +334,6 @@ public final class PropNet
     		} else if (c instanceof Not) {
     			c.setType("not");
     		} else if (c instanceof Constant) {
-    			System.out.println("!");
     			c.setType("constant");
     		}
     	}
