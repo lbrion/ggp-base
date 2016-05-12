@@ -55,6 +55,7 @@ public class SamplePropNetStateMachine extends StateMachine {
      */
     @Override
     public boolean isTerminal(MachineState state) {
+    	clearPropnet();
     	markBases(state);
         return markProposition(propNet.getTerminalProposition());
     }
@@ -183,21 +184,11 @@ public class SamplePropNetStateMachine extends StateMachine {
     		p.setValue(newVal);
     	}
 
-        /*Set<GdlSentence> contents = state.getContents();
+        Set<GdlSentence> contents = state.getContents();
     	for (Proposition p : propNet.getBasePropositions().values()) {
     		boolean oldVal = p.getValue();
     		boolean newVal = p.getSingleInput().getValue();
     		p.setValue(newVal);
-
-    		if (oldVal != newVal) {
-    			System.out.println();
-    			System.out.println(p.getName().toString() + " value = " + oldVal);
-    			System.out.println("Now it is: " + newVal);
-    			System.out.println(p.getSingleInput().getValue());
-    			System.out.println();
-    		} else {
-    			//System.out.println(p.getName() + " is still " + oldVal);
-    		}
 
     		GdlSentence pSentence = p.getName();
     		if (oldVal && !newVal) {
@@ -207,8 +198,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     		}
     	}
 
-    	MachineState nextState = new MachineState(contents);*/
-        MachineState nextState = getStateFromBase();
+    	MachineState nextState = new MachineState(contents);
+        //MachineState nextState = getStateFromBase();
         //System.out.println("Final state:");
         //System.out.println(nextState);
         return nextState;
@@ -347,7 +338,7 @@ public class SamplePropNetStateMachine extends StateMachine {
      * It uses a new auxillary data structure that I added
      */
     private void markActions(List<Move> actions) {
-    	Map<GdlSentence, Proposition> inputProps = propNet.getInputPropositions();
+    	/*Map<GdlSentence, Proposition> inputProps = propNet.getInputPropositions();
 
     	for(Proposition p : inputProps.values()) {
     		p.setValue(false);
@@ -356,24 +347,31 @@ public class SamplePropNetStateMachine extends StateMachine {
     	List<GdlSentence> actionSentences = toDoes(actions);
     	for (int i = 0; i < actionSentences.size(); i++) {
     		inputProps.get(actionSentences.get(i)).setValue(true);
+    	}*/
+
+
+    	Map<String, Proposition> moveToProp = propNet.getMoveToProp();
+
+    	for(Proposition p : moveToProp.values()) {
+    		p.setValue(false);
     	}
 
-    	/*for(int i = 0; i < actions.size(); i++) {
+    	for(int i = 0; i < actions.size(); i++) {
     		Role nextRole = roles.get(i);
     		Move m = actions.get(i);
 
     		String concat = nextRole.toString() + "|" + m.toString();
-    		if (baseProps.get(concat) == null) {
+    		if (moveToProp.get(concat) == null) {
     			System.out.println("[markActions] Not found in moveToProp??");
     			continue;
     		}
 
-    		baseProps.get(concat).setValue(true);
-    	}*/
+    		moveToProp.get(concat).setValue(true);
+    	}
     }
 
     private void clearPropnet() {
-    	for (Proposition p : propNet.getBasePropositions().values()) {
+    	for (Proposition p : propNet.getPropositions()) {
     		p.setValue(false);
     	}
     }

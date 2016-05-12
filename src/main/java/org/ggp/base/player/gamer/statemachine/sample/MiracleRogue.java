@@ -336,7 +336,9 @@ public class MiracleRogue extends SampleGamer {
 	public int simulateGame(Role firstRole, Move firstMove, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		StateMachine game = getStateMachine();
 		while(true) {
-    		if (System.currentTimeMillis() > finishBy)
+    		long a = System.currentTimeMillis();
+
+			if (System.currentTimeMillis() > finishBy)
         		return 50;
 
     		if (game.isTerminal(state)) {
@@ -347,6 +349,7 @@ public class MiracleRogue extends SampleGamer {
 
     		for(int i = 0; i < game.getRoles().size(); i++) {
     			Role role = game.getRoles().get(i);
+    			long b = System.currentTimeMillis();
 
     			if (role.equals(firstRole) && firstMove != null) {
     				moves_to_sim.add(firstMove);
@@ -380,6 +383,9 @@ public class MiracleRogue extends SampleGamer {
     				if (foundWinningMove) break;
     			}
 
+    			long c = System.currentTimeMillis();
+    			System.out.println("--- Used " + (c - b) + " ms on iteration.");
+
     			if (!foundWinningMove)
     				moves_to_sim.add(options.get(r.nextInt(options.size())));
     		}
@@ -399,7 +405,7 @@ public class MiracleRogue extends SampleGamer {
         nMetaGames = 0;
         nDepthChargesGame = 0;
 
-		int nGamesPlayed = 0;
+		/*int nGamesPlayed = 0;
         StateMachine game = getStateMachine();
         finishBy = timeout - finishByTime;
         long totalTime = timeout - System.currentTimeMillis();
@@ -436,6 +442,6 @@ public class MiracleRogue extends SampleGamer {
         	nGamesPerSimulation = 3;
         } else {
         	nGamesPerSimulation = 2;
-        }
+        }*/
     }
 }
