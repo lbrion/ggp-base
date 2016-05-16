@@ -29,9 +29,10 @@ public class SamplePropNetStateMachine extends StateMachine {
     /** The underlying proposition network  */
     private PropNet propNet;
     /** The topological ordering of the propositions */
-    private List<Proposition> ordering;
+    private List<Component> ordering;
     /** The player roles */
     private List<Role> roles;
+    private boolean[] externalRep;
 
     /**
      * Initializes the PropNetStateMachine. You should compute the topological
@@ -44,6 +45,8 @@ public class SamplePropNetStateMachine extends StateMachine {
             propNet = OptimizingPropNetFactory.create(description);
             roles = propNet.getRoles();
             ordering = getOrdering();
+
+            externalRep = new boolean[propNet.getPropositions().size()];
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -55,9 +58,10 @@ public class SamplePropNetStateMachine extends StateMachine {
      */
     @Override
     public boolean isTerminal(MachineState state) {
-    	clearPropnet();
+    	resetPropCorrect();
     	markBases(state);
         return markProposition(propNet.getTerminalProposition());
+    	//return propNet.getTerminalProposition().getValue();
     }
 
     /**
@@ -70,7 +74,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public int getGoal(MachineState state, Role role)
             throws GoalDefinitionException {
-        // TODO: Compute the goal for role in state.
+    	resetPropCorrect();
     	Set<Proposition> goalProps = propNet.getGoalPropositions().get(role);
     	int goalReward = 0;
     	boolean foundTrue = false;
@@ -97,24 +101,13 @@ public class SamplePropNetStateMachine extends StateMachine {
      */
     @Override
     public MachineState getInitialState() {
-        // TODO: Compute the initial state.
-    	//System.out.println("Getting initial state");
-
+    	clearPropnet();
+    	resetPropCorrect();
     	Proposition initProp = propNet.getInitProposition();
     	initProp.setValue(true);
 
-    	/*Set<GdlSentence> contents = new HashSet<GdlSentence>();
-    	for (Proposition p : propNet.getBasePropositions().values()) {
-    		boolean initBaseValue = markProposition(p.getSingleInput());
-    		p.setValue(initBaseValue);
-
-    		if (initBaseValue)
-    			contents.add(p.getName());
-    	}
-
-    	MachineState initState = new MachineState(contents);
-    	return initState;
-    	*/return getStateFromBase();
+    	populateExternalRep();
+    	return getStateFromBase();
     }
 
     /**
@@ -124,7 +117,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     public List<Move> findActions(Role role)
             throws MoveDefinitionException {
     	System.out.println("Finding actions.");
-        // TODO: Compute legal moves.
+    	resetPropCorrect();
     	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
     	List<Move> allMoves = new ArrayList<Move>();
 
@@ -142,10 +135,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public List<Move> getLegalMoves(MachineState state, Role role)
             throws MoveDefinitionException {
+    	resetPropCorrect();
     	markBases(state);
-    	//System.out.println("Getting legal moves for " + role.toString());
-
-        // TODO: Compute legal moves.
     	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
     	List<Move> legalMoves = new ArrayList<Move>();
 
@@ -153,11 +144,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     		if (markProposition(p)) {
     			Move m = getMoveFromProposition(p);
     			legalMoves.add(m);
-    			//System.out.print(m + ", ");
     		}
     	}
-
-    	//System.out.println();
 
         return legalMoves;
     }
@@ -168,23 +156,31 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public MachineState getNextState(MachineState state, List<Move> moves)
             throws TransitionDefinitionException {
-        // TODO: Compute the next state.
-    	// FIXME: We need to do something to state here with moves before we mark bases.
-    	for (Proposition p : propNet.getPropositions()) {
-    		p.setValue(false);
-    	}
+    	clearPropnet();
+    	resetPropCorrect();
 
     	markActions(moves);
     	markBases(state);
 
     	for (int i = 0; i < ordering.size(); i++) {
-    		Proposition p = ordering.get(i);
-    		boolean oldVal = p.getValue();
-    		boolean newVal = markProposition(p);
-    		p.setValue(newVal);
+    		Component c = ordering.get(i);
+    		//c.evaluateIfInputsChanged();
+
+    		//if (!c.getHasChanged())
+    		//	continue;
+
+    		boolean oldVal = c.getVal();
+    		boolean newVal = markProposition(c);
+    		c.setVal(newVal);
+    		c.setIsCorrect(true);
+
+    		//if (oldVal != newVal) {
+    		//	c.setHasChanged(true);
+    		//}
     	}
 
-        Set<GdlSentence> contents = state.getContents();
+    	// THIS CODE IS WRONG
+        /*Set<GdlSentence> contents = state.getContents();
     	for (Proposition p : propNet.getBasePropositions().values()) {
     		boolean oldVal = p.getValue();
     		boolean newVal = p.getSingleInput().getValue();
@@ -196,12 +192,10 @@ public class SamplePropNetStateMachine extends StateMachine {
     		} else if (!oldVal && newVal) {
     			contents.add(pSentence);
     		}
-    	}
+    	}*/
 
-    	MachineState nextState = new MachineState(contents);
-        //MachineState nextState = getStateFromBase();
-        //System.out.println("Final state:");
-        //System.out.println(nextState);
+    	MachineState nextState = getStateFromBase();
+    	//MachineState nextState = new MachineState(contents);
         return nextState;
     }
 
@@ -219,10 +213,10 @@ public class SamplePropNetStateMachine extends StateMachine {
      *
      * @return The order in which the truth values of propositions need to be set.
      */
-    public List<Proposition> getOrdering()
+    public List<Component> getOrdering()
     {
         // List to contain the topological ordering.
-        List<Proposition> order = new ArrayList<Proposition>();
+        List<Component> order = new ArrayList<Component>();
 
         // All of the components in the PropNet
         List<Component> components = new ArrayList<Component>(propNet.getComponents());
@@ -267,8 +261,7 @@ public class SamplePropNetStateMachine extends StateMachine {
         			compsToExamine.remove(c);
         			i--;
 
-        			if (c instanceof Proposition)
-        				order.add((Proposition) c);
+        			order.add(c);
         		}
         	}
         }
@@ -286,7 +279,9 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     private boolean markProposition(Component c) {
     	String type = c.getType();
-    	//System.out.println(type);
+
+    	if (c.isCorrect())
+    		return c.getVal();
 
     	if (type.equals("input") || type.equals("base") || type.equals("constant")) {
     		return c.getValue();
@@ -326,10 +321,15 @@ public class SamplePropNetStateMachine extends StateMachine {
     	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
 
     	for (GdlSentence gdl : baseProps.keySet()) {
+    		Proposition p = baseProps.get(gdl);
     		if (stateGDL.contains(gdl)) {
-    			baseProps.get(gdl).setValue(true);
+    			//if (p.getValue() == false)
+    			//	p.setHasChanged(true);
+    			p.setValue(true);
     		} else {
-    			baseProps.get(gdl).setValue(false);
+    			//if (p.getValue() == true)
+    			//	p.setHasChanged(true);
+    			p.setValue(false);
     		}
     	}
     }
@@ -338,21 +338,11 @@ public class SamplePropNetStateMachine extends StateMachine {
      * It uses a new auxillary data structure that I added
      */
     private void markActions(List<Move> actions) {
-    	/*Map<GdlSentence, Proposition> inputProps = propNet.getInputPropositions();
-
-    	for(Proposition p : inputProps.values()) {
-    		p.setValue(false);
-    	}
-
-    	List<GdlSentence> actionSentences = toDoes(actions);
-    	for (int i = 0; i < actionSentences.size(); i++) {
-    		inputProps.get(actionSentences.get(i)).setValue(true);
-    	}*/
-
-
     	Map<String, Proposition> moveToProp = propNet.getMoveToProp();
 
     	for(Proposition p : moveToProp.values()) {
+    		//if (p.getValue())
+    		//	p.setHasChanged(true);
     		p.setValue(false);
     	}
 
@@ -366,16 +356,49 @@ public class SamplePropNetStateMachine extends StateMachine {
     			continue;
     		}
 
-    		moveToProp.get(concat).setValue(true);
+    		Proposition p = moveToProp.get(concat);
+    		//if (p.getValue() == false)
+    		//	p.setHasChanged(true);
+    		p.setValue(true);
     	}
     }
 
     private void clearPropnet() {
     	for (Proposition p : propNet.getPropositions()) {
+    		String type = p.getType();
+    		if (type.equals("constant"))
+    			continue;
+
     		p.setValue(false);
     	}
     }
 
+    public boolean[] getExternalRep() {
+    	return externalRep;
+    }
+
+    // allows you to pass in new value array
+    public void setExternalRep(boolean[] newValues) {
+    	externalRep = newValues.clone();
+    	List<Proposition> allProps = propNet.getPropositions();
+    	for (int i = 0; i < allProps.size(); i++) {
+    		allProps.get(i).setValue(newValues[i]);
+    	}
+    }
+
+    public void populateExternalRep() {
+    	List<Proposition> allProps = propNet.getPropositions();
+    	for (int i = 0; i < allProps.size(); i++) {
+    		externalRep[i] = allProps.get(i).getValue();
+    	}
+    }
+
+    public void resetPropCorrect() {
+    	for (Component c : propNet.getComponents()) {
+    		c.setIsCorrect(false);
+    		//c.setHasChanged(true);
+    	}
+    }
 
     /**
      * The Input propositions are indexed by (does ?player ?action).

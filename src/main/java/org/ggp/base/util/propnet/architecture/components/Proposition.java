@@ -12,7 +12,7 @@ public final class Proposition extends Component
     /** The name of the Proposition. */
     private GdlSentence name;
     /** The value of the Proposition. */
-    private boolean value;
+    //private boolean value;
 
     /**
      * Creates a new Proposition with name <tt>name</tt>.
@@ -23,7 +23,7 @@ public final class Proposition extends Component
     public Proposition(GdlSentence name)
     {
         this.name = name;
-        this.value = false;
+        //this.value = false;
     }
 
     /**
@@ -55,7 +55,7 @@ public final class Proposition extends Component
     @Override
     public boolean getValue()
     {
-        return value;
+        return getVal();
     }
 
     /**
@@ -66,7 +66,7 @@ public final class Proposition extends Component
      */
     public void setValue(boolean value)
     {
-        this.value = value;
+        setVal(value);
     }
 
     /**
@@ -75,6 +75,7 @@ public final class Proposition extends Component
     @Override
     public String toString()
     {
+    	boolean value = getValue();
     	return toDot("circle", value ? "red" : "white", name.toString());
     }
 }

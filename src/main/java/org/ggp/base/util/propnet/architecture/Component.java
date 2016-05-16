@@ -18,8 +18,11 @@ public abstract class Component implements Serializable
     private final Set<Component> inputs;
     /** The outputs of the component. */
     private final Set<Component> outputs;
+
+    private boolean val;
     private String type;
     private boolean isCorrect;
+    private boolean hasChanged;
 
     /**
      * Creates a new Component with no inputs or outputs.
@@ -30,6 +33,8 @@ public abstract class Component implements Serializable
         this.outputs = new HashSet<Component>();
         type = "not set";
         isCorrect = false;
+        val = false;
+        hasChanged = false;
     }
 
     public String getType() {
@@ -133,6 +138,14 @@ public abstract class Component implements Serializable
      */
     public abstract boolean getValue();
 
+    public boolean getVal() {
+    	return val;
+    }
+
+    public void setVal(boolean newVal) {
+    	val = newVal;
+    }
+
     // these fns are meant to allow for caching
     public boolean isCorrect() {
     	return isCorrect;
@@ -140,6 +153,25 @@ public abstract class Component implements Serializable
 
     public void setIsCorrect (boolean isNowCorrect) {
     	isCorrect = isNowCorrect;
+    }
+
+    public void evaluateIfInputsChanged() {
+    	boolean inputsChanged = false;
+    	for (Component c : inputs) {
+    		if (c.getHasChanged()) {
+    			inputsChanged = true;
+    			break;
+    		}
+    	}
+    	hasChanged = inputsChanged;
+    }
+
+    public boolean getHasChanged() {
+    	return hasChanged;
+    }
+
+    public void setHasChanged(boolean hasJustChanged) {
+    	hasChanged = hasJustChanged;
     }
 
     /**

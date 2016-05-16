@@ -14,9 +14,11 @@ import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.StateMachine;
+import org.ggp.base.util.statemachine.cache.CachedStateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
+import org.ggp.base.util.statemachine.implementation.propnet.SamplePropNetStateMachine;
 
 public class MiracleRogue extends SampleGamer {
 	private Random r = new Random();
@@ -49,6 +51,7 @@ public class MiracleRogue extends SampleGamer {
 		System.out.println();
 		System.out.println("-------- Starting new move -------");
 		StateMachine game = getStateMachine();
+
         long start = System.currentTimeMillis();
         finishBy = timeout - finishByTime;
 
@@ -282,11 +285,15 @@ public class MiracleRogue extends SampleGamer {
 	 */
 	public int simulate(GamestateNode selectedNode, int count) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
 		MachineState state = selectedNode.getState();
+
+		// get prop net state machine
+		SamplePropNetStateMachine propNet = (SamplePropNetStateMachine)((CachedStateMachine) getStateMachine()).getBackedMachine();
 		System.out.println("[simulate] " + count);
 
 		int total = 0;
 		for (int i = 0; i < count; i++) {
 			nDepthChargesTurn++;
+			boolean[] oldPropnetState = propNet.getExternalRep();
 
 			if (!selectedNode.isValidState()) {
 				Move firstMove = selectedNode.getPreviousMove(getRole());
@@ -294,6 +301,8 @@ public class MiracleRogue extends SampleGamer {
 			} else {
 				total = total + depthcharge(getRole(), null, state);
 			}
+
+			propNet.setExternalRep(oldPropnetState);
 
 			if (System.currentTimeMillis() > finishBy) {
 				return total / (i + 1);
@@ -335,6 +344,7 @@ public class MiracleRogue extends SampleGamer {
 
 	public int simulateGame(Role firstRole, Move firstMove, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		StateMachine game = getStateMachine();
+		SamplePropNetStateMachine propNet = (SamplePropNetStateMachine)((CachedStateMachine) getStateMachine()).getBackedMachine();
 		while(true) {
     		long a = System.currentTimeMillis();
 
@@ -349,7 +359,6 @@ public class MiracleRogue extends SampleGamer {
 
     		for(int i = 0; i < game.getRoles().size(); i++) {
     			Role role = game.getRoles().get(i);
-    			long b = System.currentTimeMillis();
 
     			if (role.equals(firstRole) && firstMove != null) {
     				moves_to_sim.add(firstMove);
@@ -369,27 +378,31 @@ public class MiracleRogue extends SampleGamer {
     				List<List<Move>> possibleFutures = game.getLegalJointMoves(state, role, options.get(j));
 
     				for (int k = 0; k < possibleFutures.size(); k++) {
+    					boolean[] oldPropnetState = propNet.getExternalRep();
     					MachineState futureState = game.findNext(possibleFutures.get(k), state);
 
     					if (game.isTerminal(futureState)) {
     						if (game.findReward(role, futureState) == 100) {
         						moves_to_sim.add(options.get(j));
         						foundWinningMove = true;
+        						propNet.setExternalRep(oldPropnetState);
         						break;
     						}
     					}
+
+    					propNet.setExternalRep(oldPropnetState);
     				}
 
     				if (foundWinningMove) break;
     			}
 
-    			long c = System.currentTimeMillis();
-    			System.out.println("--- Used " + (c - b) + " ms on iteration.");
-
     			if (!foundWinningMove)
     				moves_to_sim.add(options.get(r.nextInt(options.size())));
     		}
     		state = game.findNext(moves_to_sim, state);
+    		//System.out.println(moves_to_sim);
+    		long c = System.currentTimeMillis();
+			System.out.println("--- Used " + (c - a) + " ms on iteration.");
     	}
 	}
 
@@ -405,7 +418,7 @@ public class MiracleRogue extends SampleGamer {
         nMetaGames = 0;
         nDepthChargesGame = 0;
 
-		/*int nGamesPlayed = 0;
+		int nGamesPlayed = 0;
         StateMachine game = getStateMachine();
         finishBy = timeout - finishByTime;
         long totalTime = timeout - System.currentTimeMillis();
@@ -420,7 +433,7 @@ public class MiracleRogue extends SampleGamer {
     		int r = simulateGame(getRole(), null, state);
     		long eTime = System.currentTimeMillis();
 
-    		System.out.println("Took " + (eTime - sTime) + " to play.");
+    		System.out.println("[META] Took " + (eTime - sTime) + " to play.");
         	nGamesPlayed++;
         }
 
@@ -442,6 +455,6 @@ public class MiracleRogue extends SampleGamer {
         	nGamesPerSimulation = 3;
         } else {
         	nGamesPerSimulation = 2;
-        }*/
+        }
     }
 }

@@ -3,6 +3,7 @@ package org.ggp.base.util.propnet.architecture;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -73,7 +74,7 @@ public final class PropNet
     private final Set<Component> components;
 
     /** References to every Proposition in the PropNet. */
-    private final Set<Proposition> propositions;
+    private final List<Proposition> propositions;
     private final Set<And> ands;
     private final Set<Or> ors;
     private final Set<Transition> transitions;
@@ -255,7 +256,7 @@ public final class PropNet
      *
      * @return References to every Proposition in the PropNet.
      */
-    public Set<Proposition> getPropositions()
+    public List<Proposition> getPropositions()
     {
         return propositions;
     }
@@ -534,9 +535,9 @@ public final class PropNet
      *
      * @return An index over Propositions in the PropNet.
      */
-    private Set<Proposition> recordPropositions()
+    private List<Proposition> recordPropositions()
     {
-        Set<Proposition> propositions = new HashSet<Proposition>();
+        List<Proposition> propositions = new ArrayList<Proposition>();
         for (Component component : components)
         {
             if (component instanceof Proposition) {
