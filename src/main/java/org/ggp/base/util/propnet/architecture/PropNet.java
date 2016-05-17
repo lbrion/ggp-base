@@ -76,6 +76,7 @@ public final class PropNet
 
     /** References to every Proposition in the PropNet. */
     private final List<Proposition> propositions;
+    Proposition[] propositionArray;
 
     private final Map<GdlSentence, Proposition> viewPropositions;
     /** References to every BaseProposition in the PropNet, indexed by name. */
@@ -323,6 +324,7 @@ public final class PropNet
     private void fillArrays() {
     	fillComponentsArray();
     	fillLegalArray();
+    	fillPropositionArray();
     }
 
     private void fillComponentsArray() {
@@ -356,6 +358,18 @@ public final class PropNet
     			j++;
     		}
     	}
+    }
+
+    private void fillPropositionArray() {
+    	propositionArray = new Proposition[propositions.size()];
+    	for (int i = 0; i < propositions.size(); i++) {
+    		Proposition p = propositions.get(i);
+    		propositionArray[i] = p;
+    	}
+    }
+
+    public Proposition[] getPropositionArray() {
+    	return propositionArray;
     }
 
     public Proposition[][] getEntireLegalArray() {

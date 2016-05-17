@@ -338,7 +338,7 @@ public class MiracleRogue extends SampleGamer {
 		int r = simulateGame(role, firstMove, state);
 		long eTime = System.currentTimeMillis();
 
-		//System.out.println("Took " + (eTime - sTime) + " to play.");
+		System.out.println("Took " + (eTime - sTime) + " to play.");
 
 		return r;
 	}

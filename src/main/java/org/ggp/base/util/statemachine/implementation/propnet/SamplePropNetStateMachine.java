@@ -1,6 +1,7 @@
 package org.ggp.base.util.statemachine.implementation.propnet;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -79,14 +80,18 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public int getGoal(MachineState state, Role role)
             throws GoalDefinitionException {
-    	//resetPropCorrect();
     	Set<Proposition> goalProps = propNet.getGoalPropositions().get(role);
     	int goalReward = 0;
     	boolean foundTrue = false;
 
+    	Set<Component> ancestors = new HashSet<Component>();
+    	for (Proposition p : goalProps) {
+    		ancestors.addAll(propNet.getPropAncestors(p));
+    	}
+    	setAncestorsFalse(ancestors);
+
     	for (Proposition p : goalProps) {
     		//setPropAncestorsIncorrect(p, false);
-    		propNet.setPropAncestorsNotCorrect(p);
     		p.setValue(markProposition(p));
     		if (p.getValue()) {
     			goalReward = getGoalValue(p);
@@ -145,12 +150,12 @@ public class SamplePropNetStateMachine extends StateMachine {
     	List<Move> legalMoves = new ArrayList<Move>();
 
     	Proposition[] legalProps = propNet.getLegalArray(role);
-    	for (int i = 0; i < legalProps.length; i++) {
-    		Proposition p = legalProps[i];
+
+    	//Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
+    	for (Proposition p : legalProps) {
     		if (p == null)
     			break;
 
-    		//setPropAncestorsIncorrect(p, false);
     		propNet.setPropAncestorsNotCorrect(p);
     		if (markProposition(p)) {
     			Move m = getMoveFromProposition(p);
@@ -309,22 +314,23 @@ public class SamplePropNetStateMachine extends StateMachine {
     	Set<GdlSentence> stateGDL = state.getContents();
     	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
 
-    	//Set<Component> changedProps = new HashSet<Component>();
+    	//Set<Component> ancestors = new HashSet<Component>();
     	for (GdlSentence gdl : baseProps.keySet()) {
     		Proposition p = baseProps.get(gdl);
     		if (stateGDL.contains(gdl)) {
     			if (p.getValue() == false)
-    				//changedProps.add(p);
+    				//ancestors.addAll(propNet.getPropAncestors(p));
     				propNet.setPropAncestorsNotCorrect(p);
     			p.setValue(true);
     		} else {
     			if (p.getValue() == true)
-    				//changedProps.add(p);
+    				//ancestors.addAll(propNet.getPropAncestors(p));
     				propNet.setPropAncestorsNotCorrect(p);
     			p.setValue(false);
     		}
     	}
-    	//setPropAncestorsIncorrect(changedProps, true);
+
+    	//setAncestorsFalse(ancestors);
     }
 
     /* Note: this function looks good for now
@@ -332,12 +338,14 @@ public class SamplePropNetStateMachine extends StateMachine {
      */
     private void markActions(List<Move> actions) {
     	Map<String, Proposition> moveToProp = propNet.getMoveToProp();
+    	Map<Proposition, Boolean> oldValues = new HashMap<Proposition, Boolean>();
 
     	for(Proposition p : moveToProp.values()) {
+    		oldValues.put(p, p.getValue());
     		p.setValue(false);
     	}
 
-    	//Set<Component> changedProps = new HashSet<Component>();
+    	//Set<Component> ancestors = new HashSet<Component>();
     	for(int i = 0; i < actions.size(); i++) {
     		Role nextRole = roles.get(i);
     		Move m = actions.get(i);
@@ -349,14 +357,13 @@ public class SamplePropNetStateMachine extends StateMachine {
     		}
 
     		Proposition p = moveToProp.get(concat);
-    		if (p.getValue() == false)
+    		if (oldValues.get(p) == false)
+    			//ancestors.addAll(propNet.getPropAncestors(p));
     			propNet.setPropAncestorsNotCorrect(p);
-    			//changedProps.add(p);
-    			//setPropAncestorsIncorrect(p);
     		p.setValue(true);
     	}
 
-    	//setPropAncestorsIncorrect(changedProps, true);
+    	//setAncestorsFalse(ancestors);
     }
 
     private void clearPropnet() {
@@ -366,6 +373,12 @@ public class SamplePropNetStateMachine extends StateMachine {
     			continue;
 
     		p.setValue(false);
+    	}
+    }
+
+    private void setAncestorsFalse(Set<Component> ancestors) {
+    	for (Component c : ancestors) {
+    		c.setIsCorrect(false);
     	}
     }
 
