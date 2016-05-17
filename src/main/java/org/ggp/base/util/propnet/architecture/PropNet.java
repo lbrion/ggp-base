@@ -72,12 +72,10 @@ public final class PropNet
 {
     /** References to every component in the PropNet. */
     private final Set<Component> components;
+    private Component[] componentsArray;
 
     /** References to every Proposition in the PropNet. */
     private final List<Proposition> propositions;
-    private final Set<And> ands;
-    private final Set<Or> ors;
-    private final Set<Transition> transitions;
 
     private final Map<GdlSentence, Proposition> viewPropositions;
     /** References to every BaseProposition in the PropNet, indexed by name. */
@@ -91,6 +89,7 @@ public final class PropNet
 
     /** References to every LegalProposition in the PropNet, indexed by role. */
     private final Map<Role, Set<Proposition>> legalPropositions;
+    Proposition[][] legalByRole;
 
     /** References to every GoalProposition in the PropNet, indexed by role. */
     private final Map<Role, Set<Proposition>> goalPropositions;
@@ -103,6 +102,7 @@ public final class PropNet
 
     /** A helper mapping between input/legal propositions. */
     private final Map<Proposition, Proposition> legalInputMap;
+    private Map<Proposition, Set<Component>> propToAncestors;
 
     /** A helper list of all of the roles. */
     private final List<Role> roles;
@@ -111,10 +111,6 @@ public final class PropNet
     {
         components.add(c);
         if (c instanceof Proposition) propositions.add((Proposition)c);
-        else if (c instanceof And) ands.add((And)c);
-        else if (c instanceof Or) ors.add((Or)c);
-        else if (c instanceof Transition) transitions.add((Transition)c);
-        else System.out.println("[addComponent] weird instance object");
     }
 
     /**
@@ -130,8 +126,6 @@ public final class PropNet
         this.roles = roles;
         this.components = components;
         this.propositions = recordPropositions();
-        this.ands = new HashSet<And>();
-        this.ors = new HashSet<Or>();
         this.basePropositions = recordBasePropositions();
         this.inputPropositions = recordInputPropositions();
         this.legalPropositions = recordLegalPropositions();
@@ -140,8 +134,9 @@ public final class PropNet
         this.terminalProposition = recordTerminalProposition();
         this.legalInputMap = makeLegalInputMap();
         this.viewPropositions = recordViewPropositions();
-        this.transitions = recordTransitions();
         recordAndOrNot();
+        fillArrays();
+        findAllPropAncestors();
     }
 
     public List<Role> getRoles()
@@ -261,21 +256,6 @@ public final class PropNet
         return propositions;
     }
 
-    public Set<Or> getOrs()
-    {
-        return ors;
-    }
-
-    public Set<And> getAnds()
-    {
-        return ands;
-    }
-
-    public Set<Transition> getTransitions()
-    {
-        return transitions;
-    }
-
     /**
      * Getter method.
      *
@@ -340,17 +320,153 @@ public final class PropNet
     	}
     }
 
-    private Set<Transition> recordTransitions() {
-    	Set<Transition> transitions = new HashSet<Transition>();
+    private void fillArrays() {
+    	fillComponentsArray();
+    	fillLegalArray();
+    }
 
+    private void fillComponentsArray() {
+    	componentsArray = new Component[components.size()];
+    	int index = 0;
     	for (Component c : components) {
-    		if (c instanceof Transition) {
-    			c.setType("transition");
-    			transitions.add((Transition)c);
+    		componentsArray[index] = c;
+    		index++;
+    	}
+    }
+
+    private void fillLegalArray() {
+    	int largestSize = -1;
+    	for (Role r : legalPropositions.keySet()) {
+    		int size = legalPropositions.get(r).size();
+    		if (size > largestSize)
+    			largestSize = size;
+    	}
+
+    	legalByRole = new Proposition[roles.size()][largestSize];
+    	for (int i = 0; i < roles.size(); i++) {
+    		Role nextRole = roles.get(i);
+    		for (int j = 0; j < legalByRole[i].length; j++) {
+    			legalByRole[i][j] = null;
+    		}
+
+    		Set<Proposition> nextLegal = legalPropositions.get(nextRole);
+    		int j = 0;
+    		for (Proposition p : nextLegal) {
+    			legalByRole[i][j] = p;
+    			j++;
+    		}
+    	}
+    }
+
+    public Proposition[][] getEntireLegalArray() {
+    	return legalByRole;
+    }
+
+    public Proposition[] getLegalArray(Role r) {
+    	int index = 0;
+    	for (Role nextRole : roles) {
+    		if (nextRole.equals(r))
+    			return legalByRole[index];
+    		index++;
+
+    	}
+    	System.out.println("[getLegalArray] ERROR");
+    	return null;
+    }
+
+    public Component[] getComponentsArray() {
+    	return componentsArray;
+    }
+
+    private void findAllPropAncestors() {
+    	propToAncestors = new HashMap<Proposition, Set<Component>>();
+    	Map<Proposition, Boolean> allRoots = new HashMap<Proposition, Boolean>();
+
+    	// add terminal prop
+    	allRoots.put(terminalProposition, false);
+
+    	// add goal props
+    	for (Set<Proposition> s : goalPropositions.values()) {
+    		for (Proposition p : s) {
+    			allRoots.put(p, false);
     		}
     	}
 
-    	return transitions;
+    	// add legal props
+    	for (Proposition[] legalForRole : legalByRole) {
+    		for (Proposition p : legalForRole) {
+    			allRoots.put(p, false);
+    		}
+    	}
+
+    	// add input props
+    	for (Proposition p : moveToProp.values()) {
+    		allRoots.put(p, true);
+    	}
+
+    	// add base props
+    	for (Proposition p : basePropositions.values()) {
+    		allRoots.put(p, true);
+    	}
+
+    	for (Proposition p : allRoots.keySet()) {
+    		Set<Component> allAncestors = findPropAncestors(p, allRoots.get(p));
+    		propToAncestors.put(p, allAncestors);
+    	}
+    }
+
+    public Map<Proposition, Set<Component>> getPropToAncestors() {
+    	return propToAncestors;
+    }
+
+    public Set<Component> getPropAncestors(Proposition p) {
+    	return propToAncestors.get(p);
+    }
+
+    public void setPropAncestorsNotCorrect(Proposition p) {
+    	Set<Component> ancestors = getPropAncestors(p);
+    	for (Component c : ancestors) {
+    		c.setIsCorrect(false);
+    	}
+    }
+
+    // iteratively finds a component's connected components, sets their isCorrect flags and then
+    // finds those components' components
+    // @param roots = starting node
+    //		  setOutputs = whether we are looking at a components' outputs (false if inputs)
+    private Set<Component> findPropAncestors(Component root, boolean setOutputs) {
+    	Set<Component> donezo = new HashSet<Component>();
+    	List<Component> queue = new ArrayList<Component>();
+
+    	donezo.add(root);
+    	queue.add(root);
+
+    	return setAncestors(queue, donezo, setOutputs);
+    }
+
+    // decomposition method for findPropAncestors()
+    private Set<Component> setAncestors(List<Component> queue, Set<Component> donezo, boolean setOutputs) {
+    	Set<Component> ancestors = new HashSet<Component>();
+    	while(queue.size() > 0) {
+    		Component c = queue.get(0);
+    		queue.remove(0);
+
+    		//c.setIsCorrect(false);
+    		ancestors.add(c);
+
+    		Set<Component> nextComponents;
+    		if (setOutputs) nextComponents = c.getOutputs();
+    		else nextComponents = c.getInputs();
+
+    		for (Component next : nextComponents) {
+    			if (donezo.contains(next))
+    				continue;
+    			queue.add(next);
+    			donezo.add(next);
+    		}
+    	}
+
+    	return ancestors;
     }
 
     /* I added this to find view propositions

@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.ggp.base.util.gdl.grammar.GdlDistinct;
 import org.ggp.base.util.gdl.grammar.GdlLiteral;
@@ -35,7 +34,7 @@ public final class PropNetConverter
     /** An archive of Propositions, indexed by name. */
     private Map<GdlSentence, Proposition> propositions;
     /** An archive of Components. */
-    private Set<Component> components;
+    private HashSet<Component> components;
 
     /**
      * Converts a game description to a PropNet using the following process

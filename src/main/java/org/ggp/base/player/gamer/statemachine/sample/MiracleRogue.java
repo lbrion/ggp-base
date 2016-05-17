@@ -288,12 +288,13 @@ public class MiracleRogue extends SampleGamer {
 
 		// get prop net state machine
 		SamplePropNetStateMachine propNet = (SamplePropNetStateMachine)((CachedStateMachine) getStateMachine()).getBackedMachine();
-		System.out.println("[simulate] " + count);
+		//System.out.println("[simulate] " + count);
 
 		int total = 0;
 		for (int i = 0; i < count; i++) {
 			nDepthChargesTurn++;
 			boolean[] oldPropnetState = propNet.getExternalRep();
+			boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
 
 			if (!selectedNode.isValidState()) {
 				Move firstMove = selectedNode.getPreviousMove(getRole());
@@ -302,7 +303,7 @@ public class MiracleRogue extends SampleGamer {
 				total = total + depthcharge(getRole(), null, state);
 			}
 
-			propNet.setExternalRep(oldPropnetState);
+			propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
 
 			if (System.currentTimeMillis() > finishBy) {
 				return total / (i + 1);
@@ -337,7 +338,7 @@ public class MiracleRogue extends SampleGamer {
 		int r = simulateGame(role, firstMove, state);
 		long eTime = System.currentTimeMillis();
 
-		System.out.println("Took " + (eTime - sTime) + " to play.");
+		//System.out.println("Took " + (eTime - sTime) + " to play.");
 
 		return r;
 	}
@@ -379,18 +380,19 @@ public class MiracleRogue extends SampleGamer {
 
     				for (int k = 0; k < possibleFutures.size(); k++) {
     					boolean[] oldPropnetState = propNet.getExternalRep();
+    					boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
     					MachineState futureState = game.findNext(possibleFutures.get(k), state);
 
     					if (game.isTerminal(futureState)) {
     						if (game.findReward(role, futureState) == 100) {
         						moves_to_sim.add(options.get(j));
         						foundWinningMove = true;
-        						propNet.setExternalRep(oldPropnetState);
+        						propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
         						break;
     						}
     					}
 
-    					propNet.setExternalRep(oldPropnetState);
+    					propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
     				}
 
     				if (foundWinningMove) break;
@@ -402,7 +404,7 @@ public class MiracleRogue extends SampleGamer {
     		state = game.findNext(moves_to_sim, state);
     		//System.out.println(moves_to_sim);
     		long c = System.currentTimeMillis();
-			System.out.println("--- Used " + (c - a) + " ms on iteration.");
+			//System.out.println("--- Used " + (c - a) + " ms on iteration.");
     	}
 	}
 
@@ -433,7 +435,7 @@ public class MiracleRogue extends SampleGamer {
     		int r = simulateGame(getRole(), null, state);
     		long eTime = System.currentTimeMillis();
 
-    		System.out.println("[META] Took " + (eTime - sTime) + " to play.");
+    		//System.out.println("[META] Took " + (eTime - sTime) + " to play.");
         	nGamesPlayed++;
         }
 
@@ -445,16 +447,7 @@ public class MiracleRogue extends SampleGamer {
         gamesPerSecond *= 1000;
 
         // arbitrary setting based on nGames / second
-        if (gamesPerSecond > 50) {
-        	nGamesPerSimulation = 50;
-        } else if (gamesPerSecond > 10) {
-        	nGamesPerSimulation = 10;
-        } else if (gamesPerSecond > 5) {
-        	nGamesPerSimulation = 6;
-        } else if (gamesPerSecond > 1) {
-        	nGamesPerSimulation = 3;
-        } else {
-        	nGamesPerSimulation = 2;
-        }
+        nGamesPerSimulation = (int) gamesPerSecond;
+        if (nGamesPerSimulation < 2) nGamesPerSimulation = 2;
     }
 }

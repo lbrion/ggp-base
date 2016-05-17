@@ -33,6 +33,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     /** The player roles */
     private List<Role> roles;
     private boolean[] externalRep;
+    private boolean[] componentIsCorrect;
 
     /**
      * Initializes the PropNetStateMachine. You should compute the topological
@@ -47,6 +48,7 @@ public class SamplePropNetStateMachine extends StateMachine {
             ordering = getOrdering();
 
             externalRep = new boolean[propNet.getPropositions().size()];
+            componentIsCorrect = new boolean[propNet.getComponents().size()];
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -58,10 +60,13 @@ public class SamplePropNetStateMachine extends StateMachine {
      */
     @Override
     public boolean isTerminal(MachineState state) {
-    	resetPropCorrect();
     	markBases(state);
-        return markProposition(propNet.getTerminalProposition());
-    	//return propNet.getTerminalProposition().getValue();
+
+    	Proposition terminalProp = propNet.getTerminalProposition();
+    	//setPropAncestorsIncorrect(terminalProp, false);
+    	propNet.setPropAncestorsNotCorrect(terminalProp);
+
+        return markProposition(terminalProp);
     }
 
     /**
@@ -74,12 +79,14 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public int getGoal(MachineState state, Role role)
             throws GoalDefinitionException {
-    	resetPropCorrect();
+    	//resetPropCorrect();
     	Set<Proposition> goalProps = propNet.getGoalPropositions().get(role);
     	int goalReward = 0;
     	boolean foundTrue = false;
 
     	for (Proposition p : goalProps) {
+    		//setPropAncestorsIncorrect(p, false);
+    		propNet.setPropAncestorsNotCorrect(p);
     		p.setValue(markProposition(p));
     		if (p.getValue()) {
     			goalReward = getGoalValue(p);
@@ -117,7 +124,6 @@ public class SamplePropNetStateMachine extends StateMachine {
     public List<Move> findActions(Role role)
             throws MoveDefinitionException {
     	System.out.println("Finding actions.");
-    	resetPropCorrect();
     	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
     	List<Move> allMoves = new ArrayList<Move>();
 
@@ -135,12 +141,17 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public List<Move> getLegalMoves(MachineState state, Role role)
             throws MoveDefinitionException {
-    	resetPropCorrect();
     	markBases(state);
-    	Set<Proposition> legalProps = propNet.getLegalPropositions().get(role);
     	List<Move> legalMoves = new ArrayList<Move>();
 
-    	for (Proposition p : legalProps) {
+    	Proposition[] legalProps = propNet.getLegalArray(role);
+    	for (int i = 0; i < legalProps.length; i++) {
+    		Proposition p = legalProps[i];
+    		if (p == null)
+    			break;
+
+    		//setPropAncestorsIncorrect(p, false);
+    		propNet.setPropAncestorsNotCorrect(p);
     		if (markProposition(p)) {
     			Move m = getMoveFromProposition(p);
     			legalMoves.add(m);
@@ -157,30 +168,21 @@ public class SamplePropNetStateMachine extends StateMachine {
     public MachineState getNextState(MachineState state, List<Move> moves)
             throws TransitionDefinitionException {
     	clearPropnet();
-    	resetPropCorrect();
-
     	markActions(moves);
     	markBases(state);
 
     	for (int i = 0; i < ordering.size(); i++) {
     		Component c = ordering.get(i);
-    		//c.evaluateIfInputsChanged();
-
-    		//if (!c.getHasChanged())
-    		//	continue;
 
     		boolean oldVal = c.getVal();
     		boolean newVal = markProposition(c);
     		c.setVal(newVal);
     		c.setIsCorrect(true);
-
-    		//if (oldVal != newVal) {
-    		//	c.setHasChanged(true);
-    		//}
     	}
 
-    	// THIS CODE IS WRONG
-        /*Set<GdlSentence> contents = state.getContents();
+    	// tries to optimize from getStateFromBase() by building from pre-existing contents
+    	MachineState nextState = state.clone();
+        Set<GdlSentence> contents = nextState.getContents();
     	for (Proposition p : propNet.getBasePropositions().values()) {
     		boolean oldVal = p.getValue();
     		boolean newVal = p.getSingleInput().getValue();
@@ -192,10 +194,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     		} else if (!oldVal && newVal) {
     			contents.add(pSentence);
     		}
-    	}*/
+    	}
 
-    	MachineState nextState = getStateFromBase();
-    	//MachineState nextState = new MachineState(contents);
         return nextState;
     }
 
@@ -283,10 +283,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     	if (c.isCorrect())
     		return c.getVal();
 
-    	if (type.equals("input") || type.equals("base") || type.equals("constant")) {
+    	if (type.equals("input") || type.equals("base")) {
     		return c.getValue();
-    	} else if (type.equals("view")) {
-    		return markProposition(c.getSingleInput());
     	} else if (type.equals("not")) {
     		return !markProposition(c.getSingleInput());
     	} else if (type.equals("and")) {
@@ -301,37 +299,32 @@ public class SamplePropNetStateMachine extends StateMachine {
     			if (nextVal) { return true; }
     		}
     		return false;
-    	} else if (type.equals("transition")) {
-    		return markProposition(c.getSingleInput());
-    	} else if (type.equals("legal")) {
-    		return markProposition(c.getSingleInput());
-    	} else if (type.equals("terminal") || type.equals("goal") ||
-    			type.equals("init") || type.equals("does") || type.equals("not set")) {
+    	} else {
     		if (c.getInputs().size() == 0) return c.getValue();
     		else return markProposition(c.getSingleInput());
-    	} else {
-    		System.out.println("[markProposition] Unknown component type: " + c.getType());
-    		return c.getValue();
     	}
     }
 
     private void markBases(MachineState state) {
     	Set<GdlSentence> stateGDL = state.getContents();
-
     	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
 
+    	//Set<Component> changedProps = new HashSet<Component>();
     	for (GdlSentence gdl : baseProps.keySet()) {
     		Proposition p = baseProps.get(gdl);
     		if (stateGDL.contains(gdl)) {
-    			//if (p.getValue() == false)
-    			//	p.setHasChanged(true);
+    			if (p.getValue() == false)
+    				//changedProps.add(p);
+    				propNet.setPropAncestorsNotCorrect(p);
     			p.setValue(true);
     		} else {
-    			//if (p.getValue() == true)
-    			//	p.setHasChanged(true);
+    			if (p.getValue() == true)
+    				//changedProps.add(p);
+    				propNet.setPropAncestorsNotCorrect(p);
     			p.setValue(false);
     		}
     	}
+    	//setPropAncestorsIncorrect(changedProps, true);
     }
 
     /* Note: this function looks good for now
@@ -341,11 +334,10 @@ public class SamplePropNetStateMachine extends StateMachine {
     	Map<String, Proposition> moveToProp = propNet.getMoveToProp();
 
     	for(Proposition p : moveToProp.values()) {
-    		//if (p.getValue())
-    		//	p.setHasChanged(true);
     		p.setValue(false);
     	}
 
+    	//Set<Component> changedProps = new HashSet<Component>();
     	for(int i = 0; i < actions.size(); i++) {
     		Role nextRole = roles.get(i);
     		Move m = actions.get(i);
@@ -357,10 +349,14 @@ public class SamplePropNetStateMachine extends StateMachine {
     		}
 
     		Proposition p = moveToProp.get(concat);
-    		//if (p.getValue() == false)
-    		//	p.setHasChanged(true);
+    		if (p.getValue() == false)
+    			propNet.setPropAncestorsNotCorrect(p);
+    			//changedProps.add(p);
+    			//setPropAncestorsIncorrect(p);
     		p.setValue(true);
     	}
+
+    	//setPropAncestorsIncorrect(changedProps, true);
     }
 
     private void clearPropnet() {
@@ -377,12 +373,21 @@ public class SamplePropNetStateMachine extends StateMachine {
     	return externalRep;
     }
 
+    public boolean[] getExternalRepCorrect() {
+    	return componentIsCorrect;
+    }
+
     // allows you to pass in new value array
-    public void setExternalRep(boolean[] newValues) {
+    public void setExternalRep(boolean[] newValues, boolean[] componentIsCorrect) {
     	externalRep = newValues.clone();
     	List<Proposition> allProps = propNet.getPropositions();
     	for (int i = 0; i < allProps.size(); i++) {
     		allProps.get(i).setValue(newValues[i]);
+    	}
+
+    	Component[] allComp = propNet.getComponentsArray();
+    	for (int i = 0; i < allComp.length; i++) {
+    		allComp[i].setIsCorrect(componentIsCorrect[i]);
     	}
     }
 
@@ -391,12 +396,16 @@ public class SamplePropNetStateMachine extends StateMachine {
     	for (int i = 0; i < allProps.size(); i++) {
     		externalRep[i] = allProps.get(i).getValue();
     	}
+
+    	Component[] allComp = propNet.getComponentsArray();
+    	for (int i = 0; i < allComp.length; i++) {
+    		componentIsCorrect[i] = allComp[i].isCorrect();
+    	}
     }
 
     public void resetPropCorrect() {
     	for (Component c : propNet.getComponents()) {
     		c.setIsCorrect(false);
-    		//c.setHasChanged(true);
     	}
     }
 
