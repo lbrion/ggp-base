@@ -1,12 +1,14 @@
 package org.ggp.base.util.statemachine.implementation.propnet;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.ggp.base.util.UnionFind;
 import org.ggp.base.util.gdl.grammar.Gdl;
 import org.ggp.base.util.gdl.grammar.GdlConstant;
 import org.ggp.base.util.gdl.grammar.GdlRelation;
@@ -33,6 +35,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     private List<Component> ordering;
     /** The player roles */
     private List<Role> roles;
+    /** Components organized into disjoint sets of factors */
+    private List<Set<Component>> factors;
     private boolean[] externalRep;
     private boolean[] componentIsCorrect;
 
@@ -46,7 +50,10 @@ public class SamplePropNetStateMachine extends StateMachine {
         try {
             propNet = OptimizingPropNetFactory.create(description);
             roles = propNet.getRoles();
-            ordering = getOrdering();
+            ordering = getOrdering(factorPropnet());
+            //factorPropnet();
+            //getOrdering(new ArrayList<Component>(propNet.getComponents()));
+            System.out.println(ordering.size());
 
             externalRep = new boolean[propNet.getPropositions().size()];
             componentIsCorrect = new boolean[propNet.getComponents().size()];
@@ -147,6 +154,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     public List<Move> getLegalMoves(MachineState state, Role role)
             throws MoveDefinitionException {
     	markBases(state);
+    	Map<String, Proposition> moveToProp = propNet.getMoveToProp();
     	List<Move> legalMoves = new ArrayList<Move>();
 
     	Proposition[] legalProps = propNet.getLegalArray(role);
@@ -159,7 +167,14 @@ public class SamplePropNetStateMachine extends StateMachine {
     		propNet.setPropAncestorsNotCorrect(p);
     		if (markProposition(p)) {
     			Move m = getMoveFromProposition(p);
-    			legalMoves.add(m);
+    			String concat = role + "|" + m.toString();
+        		if (moveToProp.get(concat) == null) {
+        			System.out.println("Move not in prop net, not exploring");
+        			continue;
+        		}
+        		else {
+        			legalMoves.add(m);
+        		}
     		}
     	}
 
@@ -205,6 +220,99 @@ public class SamplePropNetStateMachine extends StateMachine {
     }
 
     /**
+     * Here we check if the terminal component is connected to an
+     * 'or' or 'and' component. If it is connected to an 'or' or
+     * 'and' component then we do not include those in the disjoint
+     * set forest. For 'or' components, we choose the smallest
+     * branch to make our new toplogical order. For 'and' components,
+     * we choose both branches to be part of our topological order.
+     *
+     * @return nothing, should update Component list to reflect factored
+     * game.
+     */
+    private List<Component> factorPropnet() {
+    	Component terminal = propNet.getTerminalProposition();
+    	Component[] propNet_comps = propNet.getComponentsArray();
+    	Component joint_or_component = null;
+    	Component joint_and_component = null;
+    	int num_ors = 0;
+    	int num_ands = 0;
+
+    	for(Component c : terminal.getInputs()) {
+    		if(c.getType() == "or") {
+    			joint_or_component = c;
+    			num_ors++;
+    		}
+    		if(c.getType() == "and") {
+    			joint_and_component = c;
+    			num_ands++;
+    		}
+    	}
+
+    	UnionFind groups = new UnionFind(propNet_comps.length);
+    	ArrayList<Component> constant_comps = new ArrayList<Component>();
+
+    	for(int i = 0; i < propNet_comps.length; i++) {
+    		Component cur = propNet_comps[i];
+
+    		if(cur.getType() == "constant") {
+    			System.out.println("Found a constant");
+    			constant_comps.add(cur);
+    			for(int j = 0; j < cur.getOutputs().size(); j++) {
+    				groups.union(i, Arrays.asList(propNet_comps).indexOf(cur.getOutputs().toArray()[j]));
+    			}
+    		}
+    		if(cur.getInputs().size() == 1) {
+    			groups.union(i, Arrays.asList(propNet_comps).indexOf(cur.getSingleInput()));
+    		}
+    		else if(cur.getInputs().size() >= 1) {
+    			for(int j = 0; j < cur.getInputs().size(); j++) {
+    				groups.union(i, Arrays.asList(propNet_comps).indexOf(cur.getInputs().toArray()[j]));
+    			}
+    		}
+    	}
+
+    	List<Component> result = new ArrayList<Component>();
+
+    	int terminal_index = Arrays.asList(propNet_comps).indexOf(terminal);
+
+    	if(num_ors == 1 || num_ands == 1) {
+    		for(int j = 0; j < terminal.getInputs().size(); j++) {
+				groups.union(terminal_index, Arrays.asList(propNet_comps).indexOf(terminal.getInputs().toArray()[j]));
+			}
+    	}
+
+    	//Adding in constant components
+    	for(int i = 0; i < constant_comps.size(); i++) {
+    		groups.union(Arrays.asList(propNet_comps).indexOf(constant_comps.get(i)), Arrays.asList(propNet_comps).indexOf(terminal));
+    	}
+
+    	for(int i = 0; i < propNet_comps.length; i++) {
+    		if(groups.find(i) == groups.find(terminal_index)) {
+    			result.add(propNet_comps[i]);
+    		}
+    	}
+
+    	System.out.println("Non Factored: ");
+
+    	for(int i = 0; i < propNet_comps.length; i++) {
+    		System.out.print(propNet_comps[i].getType() + ", ");
+    	}
+
+    	System.out.println("Factored: ");
+
+    	for(int i = 0; i < result.size(); i++) {
+    		System.out.print(result.get(i).getType() + ", ");
+    	}
+
+    	System.out.println(groups.toString());
+
+    	propNet = new PropNet(getRoles(), new HashSet<Component>(result));
+
+    	return result;
+    }
+
+    /**
      * This should compute the topological ordering of propositions.
      * Each component is either a proposition, logical gate, or transition.
      * Logical gates and transitions only have propositions as inputs.
@@ -218,16 +326,16 @@ public class SamplePropNetStateMachine extends StateMachine {
      *
      * @return The order in which the truth values of propositions need to be set.
      */
-    public List<Component> getOrdering()
+    public List<Component> getOrdering(List<Component> components)
     {
         // List to contain the topological ordering.
         List<Component> order = new ArrayList<Component>();
 
-        // All of the components in the PropNet
-        List<Component> components = new ArrayList<Component>(propNet.getComponents());
-
         // All of the propositions in the PropNet.
         List<Proposition> propositions = new ArrayList<Proposition>(propNet.getPropositions());
+
+        // All of the components in the PropNet.
+        //List<Component> components = new ArrayList<Component>(propNet.getComponents());
 
         // Compute the topological ordering.
         Set<Component> compsAlreadyExamined = new HashSet<Component>();

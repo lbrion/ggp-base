@@ -338,7 +338,7 @@ public class MiracleRogue extends SampleGamer {
 		int r = simulateGame(role, firstMove, state);
 		long eTime = System.currentTimeMillis();
 
-		System.out.println("Took " + (eTime - sTime) + " to play.");
+		//System.out.println("Took " + (eTime - sTime) + " to play.");
 
 		return r;
 	}
@@ -425,14 +425,16 @@ public class MiracleRogue extends SampleGamer {
         finishBy = timeout - finishByTime;
         long totalTime = timeout - System.currentTimeMillis();
 
+        MachineState state = game.getInitialState();
+
         while (true) {
-        	MachineState state = game.getInitialState();
+        	MachineState copy = state.clone();
 
         	if (System.currentTimeMillis() > finishBy)
         		break;
 
         	long sTime = System.currentTimeMillis();
-    		int r = simulateGame(getRole(), null, state);
+    		int r = simulateGame(getRole(), null, copy);
     		long eTime = System.currentTimeMillis();
 
     		//System.out.println("[META] Took " + (eTime - sTime) + " to play.");

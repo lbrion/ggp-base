@@ -78,7 +78,7 @@ public final class PropNet
     private final List<Proposition> propositions;
     Proposition[] propositionArray;
 
-    private final Map<GdlSentence, Proposition> viewPropositions;
+    //private final Map<GdlSentence, Proposition> viewPropositions;
     /** References to every BaseProposition in the PropNet, indexed by name. */
     private final Map<GdlSentence, Proposition> basePropositions;
 
@@ -134,7 +134,7 @@ public final class PropNet
         this.initProposition = recordInitProposition();
         this.terminalProposition = recordTerminalProposition();
         this.legalInputMap = makeLegalInputMap();
-        this.viewPropositions = recordViewPropositions();
+        //this.viewPropositions = recordViewPropositions();
         recordAndOrNot();
         fillArrays();
         findAllPropAncestors();
