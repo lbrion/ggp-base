@@ -6,6 +6,8 @@ package org.ggp.base.util;
  * */
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 public class UnionFind {
 
@@ -39,6 +41,16 @@ public class UnionFind {
       _parent[root2] = root1;
       _rank[root1]++;
     }
+  }
+
+  public void print_num_groups() {
+	  Set<Integer> group_nums = new HashSet<Integer>();
+
+	  for(int i : _parent) {
+		  group_nums.add(i);
+	  }
+
+	  System.out.println("Number of groups: " + group_nums.size());
   }
 
 

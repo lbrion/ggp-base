@@ -50,7 +50,8 @@ public class SamplePropNetStateMachine extends StateMachine {
         try {
             propNet = OptimizingPropNetFactory.create(description);
             roles = propNet.getRoles();
-            ordering = getOrdering(factorPropnet());
+            if(roles.size() == 1) ordering = getOrdering(factorPropnet());
+            else ordering = getOrdering(new ArrayList<Component>(propNet.getComponents()));
             //factorPropnet();
             //getOrdering(new ArrayList<Component>(propNet.getComponents()));
             System.out.println(ordering.size());
@@ -169,7 +170,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     			Move m = getMoveFromProposition(p);
     			String concat = role + "|" + m.toString();
         		if (moveToProp.get(concat) == null) {
-        			System.out.println("Move not in prop net, not exploring");
+        			//System.out.println("Move not in prop net, not exploring");
         			continue;
         		}
         		else {
@@ -233,6 +234,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     private List<Component> factorPropnet() {
     	Component terminal = propNet.getTerminalProposition();
     	Component[] propNet_comps = propNet.getComponentsArray();
+    	Set<Component> exclude = new HashSet<Component>();
     	Component joint_or_component = null;
     	Component joint_and_component = null;
     	int num_ors = 0;
@@ -240,12 +242,22 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     	for(Component c : terminal.getInputs()) {
     		if(c.getType() == "or") {
+    			//exclude.add(c);
     			joint_or_component = c;
     			num_ors++;
     		}
     		if(c.getType() == "and") {
+    			//exclude.add(c);
     			joint_and_component = c;
     			num_ands++;
+    		}
+    	}
+    	for(Component c : propNet_comps) {
+    		if(c.getType() == "goal") {
+    			exclude.add(c);
+    			for(Component dependent : c.getInputs()) {
+    				exclude.add(dependent);
+    			}
     		}
     	}
 
@@ -262,7 +274,10 @@ public class SamplePropNetStateMachine extends StateMachine {
     				groups.union(i, Arrays.asList(propNet_comps).indexOf(cur.getOutputs().toArray()[j]));
     			}
     		}
-    		if(cur.getInputs().size() == 1) {
+    		if(exclude.contains(cur)) {
+    			//pass
+    		}
+    		else if(cur.getInputs().size() == 1) {
     			groups.union(i, Arrays.asList(propNet_comps).indexOf(cur.getSingleInput()));
     		}
     		else if(cur.getInputs().size() >= 1) {
@@ -275,12 +290,30 @@ public class SamplePropNetStateMachine extends StateMachine {
     	List<Component> result = new ArrayList<Component>();
 
     	int terminal_index = Arrays.asList(propNet_comps).indexOf(terminal);
+    	int init_index = Arrays.asList(propNet_comps).indexOf(propNet.getInitProposition());
 
-    	if(num_ors == 1 || num_ands == 1) {
+    	if(num_ands == 1) {
     		for(int j = 0; j < terminal.getInputs().size(); j++) {
 				groups.union(terminal_index, Arrays.asList(propNet_comps).indexOf(terminal.getInputs().toArray()[j]));
 			}
     	}
+
+    	else if(num_ors == 1) {
+    		groups.print_num_groups();
+
+			groups.union(init_index, terminal_index);
+    		groups.print_num_groups();
+			System.out.println(groups.find(init_index) + " " + groups.find(terminal_index));
+
+			for(int j = 0; j < terminal.getInputs().size(); j++) {
+    			if(groups.find(Arrays.asList(propNet_comps).indexOf(terminal.getInputs().toArray()[j])) != groups.find(init_index)) {
+    				groups.union(init_index, Arrays.asList(propNet_comps).indexOf(terminal.getInputs().toArray()[j]));
+    				break;
+    			}
+    		}
+    	}
+
+    	System.out.println("Excluded: " + exclude);
 
     	//Adding in constant components
     	for(int i = 0; i < constant_comps.size(); i++) {
@@ -293,22 +326,36 @@ public class SamplePropNetStateMachine extends StateMachine {
     		}
     	}
 
+    	groups.print_num_groups();
+
+    	System.out.println("Result size before adding excluded: " + result.size());
+
+    	//Adding in excluded
+    	for(Component excluded : exclude) {
+    		result.add(excluded);
+    	}
+
     	System.out.println("Non Factored: ");
 
     	for(int i = 0; i < propNet_comps.length; i++) {
     		System.out.print(propNet_comps[i].getType() + ", ");
     	}
 
-    	System.out.println("Factored: ");
+    	System.out.println("\nFactored: ");
 
     	for(int i = 0; i < result.size(); i++) {
     		System.out.print(result.get(i).getType() + ", ");
     	}
 
     	System.out.println(groups.toString());
-
+    	//propNet.renderToFile("bestbal");
     	propNet = new PropNet(getRoles(), new HashSet<Component>(result));
+    	System.out.println("Result size: " + result.size());
 
+    	result = new ArrayList<Component>(new HashSet<Component>(result));
+    	System.out.println("Result size: " + result.size());
+    	System.out.println("Components size: " + propNet_comps.length);
+    	//System.exit(0);
     	return result;
     }
 
