@@ -73,10 +73,14 @@ public final class PropNet
     /** References to every component in the PropNet. */
     private final Set<Component> components;
     private Component[] componentsArray;
+    private Map<Component, Integer> componentToIndex;
 
     /** References to every Proposition in the PropNet. */
     private final List<Proposition> propositions;
     Proposition[] propositionArray;
+
+    // same as above data structure, but all values are false (this is an optimization attempt)
+    Proposition[] falsePropositionArray;
 
     //private final Map<GdlSentence, Proposition> viewPropositions;
     /** References to every BaseProposition in the PropNet, indexed by name. */
@@ -329,9 +333,11 @@ public final class PropNet
 
     private void fillComponentsArray() {
     	componentsArray = new Component[components.size()];
+    	componentToIndex = new HashMap<Component, Integer>();
     	int index = 0;
     	for (Component c : components) {
     		componentsArray[index] = c;
+    		componentToIndex.put(c,  index);
     		index++;
     	}
     }
@@ -390,6 +396,10 @@ public final class PropNet
 
     public Component[] getComponentsArray() {
     	return componentsArray;
+    }
+
+    public Component getComponent(int index) {
+    	return componentsArray[index];
     }
 
     private void findAllPropAncestors() {

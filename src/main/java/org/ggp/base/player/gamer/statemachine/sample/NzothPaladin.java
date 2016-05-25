@@ -291,6 +291,7 @@ public class NzothPaladin extends SampleGamer {
 			nDepthChargesTurn++;
 			boolean[] oldPropnetState = propNet.getExternalRep();
 			boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
+			//boolean stateCorrect = propNet.stateIsCorrect();
 
 			if (!selectedNode.isValidState()) {
 				Move firstMove = selectedNode.getPreviousMove(getRole());
@@ -300,6 +301,7 @@ public class NzothPaladin extends SampleGamer {
 			}
 
 			propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
+			//propNet.setStateCorrect(stateCorrect);
 
 			if (System.currentTimeMillis() > finishBy) {
 				return total / (i + 1);
@@ -342,27 +344,22 @@ public class NzothPaladin extends SampleGamer {
 	public int simulateGame(Role firstRole, Move firstMove, MachineState state) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		StateMachine game = getStateMachine();
 		SamplePropNetStateMachine propNet = (SamplePropNetStateMachine)((CachedStateMachine) getStateMachine()).getBackedMachine();
+		propNet.setStateCorrect(false);
 		while(true) {
     		long a = System.currentTimeMillis();
 
 			if (System.currentTimeMillis() > finishBy)
         		return 50;
 
-			System.out.println("Should be false: " + propNet.stateIsCorrect());
-
     		if (game.isTerminal(state)) {
     			return game.findReward(getRole(), state);
     		}
 
-    		System.out.println("Should be true: " + propNet.stateIsCorrect());
-
-    		//System.out.println("After terminal call");
-
+    		propNet.setStateCorrect(true);
     		List<Move> moves_to_sim = new ArrayList<Move>();
 
     		for(int i = 0; i < game.getRoles().size(); i++) {
     			Role role = game.getRoles().get(i);
-    			//System.out.println("Next role's move: " + role);
 
     			if (role.equals(firstRole) && firstMove != null) {
     				moves_to_sim.add(firstMove);
@@ -376,35 +373,12 @@ public class NzothPaladin extends SampleGamer {
     				continue;
     			}
 
-    			/*boolean foundWinningMove = false;
-
-    			for (int j = 0; j < options.size(); j++) {
-    				List<List<Move>> possibleFutures = game.getLegalJointMoves(state, role, options.get(j));
-
-    				for (int k = 0; k < possibleFutures.size(); k++) {
-    					boolean[] oldPropnetState = propNet.getExternalRep();
-    					boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
-    					MachineState futureState = game.findNext(possibleFutures.get(k), state);
-
-    					if (game.isTerminal(futureState)) {
-    						if (game.findReward(role, futureState) == 100) {
-        						moves_to_sim.add(options.get(j));
-        						foundWinningMove = true;
-        						propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
-        						break;
-    						}
-    					}
-
-    					propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
-    				}
-
-    				if (foundWinningMove) break;
-    			}
-
-    			if (!foundWinningMove)*/
-    				moves_to_sim.add(options.get(r.nextInt(options.size())));
+    			moves_to_sim.add(options.get(r.nextInt(options.size())));
     		}
+
+    		propNet.setStateCorrect(false);
     		state = game.findNext(moves_to_sim, state);
+    		propNet.setStateCorrect(true);
     		//System.out.println(moves_to_sim);
     		long c = System.currentTimeMillis();
 			//System.out.println("--- Used " + (c - a) + " ms on iteration.");
@@ -437,7 +411,7 @@ public class NzothPaladin extends SampleGamer {
         		break;
 
         	long sTime = System.currentTimeMillis();
-    		int r = simulateGame(getRole(), null, copy);
+    		//int r = simulateGame(getRole(), null, copy);
     		long eTime = System.currentTimeMillis();
 
     		//System.out.println("[META] Took " + (eTime - sTime) + " to play.");

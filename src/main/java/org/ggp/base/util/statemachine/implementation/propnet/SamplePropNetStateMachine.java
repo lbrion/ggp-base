@@ -128,7 +128,6 @@ public class SamplePropNetStateMachine extends StateMachine {
     	initProp.setValue(true);
 
     	populateExternalRep();
-    	stateIsCorrect = false;
 
     	return getStateFromBase();
     }
@@ -220,7 +219,6 @@ public class SamplePropNetStateMachine extends StateMachine {
     		}
     	}
 
-    	//stateIsCorrect = false;
         return nextState;
     }
 
@@ -470,8 +468,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     }
 
     private void markBases(MachineState state) {
-    	//if (stateIsCorrect)
-    	//	return;
+    	if (stateIsCorrect)
+    		return;
 
     	Set<GdlSentence> stateGDL = state.getContents();
     	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
@@ -491,8 +489,6 @@ public class SamplePropNetStateMachine extends StateMachine {
     			p.setValue(false);
     		}
     	}
-
-    	//stateIsCorrect = true;
 
     	//setAncestorsFalse(ancestors);
     }
@@ -528,6 +524,12 @@ public class SamplePropNetStateMachine extends StateMachine {
     	}
 
     	//setAncestorsFalse(ancestors);
+    }
+
+    private void clearPropnetForNextState() {
+    	for (Proposition p : propNet.getInputPropositions().values()) {
+    		p.setValue(false);
+    	}
     }
 
     private void clearPropnet() {

@@ -373,7 +373,7 @@ public class MiracleRogue extends SampleGamer {
     				continue;
     			}
 
-    			/*boolean foundWinningMove = false;
+    			boolean foundWinningMove = false;
 
     			for (int j = 0; j < options.size(); j++) {
     				List<List<Move>> possibleFutures = game.getLegalJointMoves(state, role, options.get(j));
@@ -398,7 +398,7 @@ public class MiracleRogue extends SampleGamer {
     				if (foundWinningMove) break;
     			}
 
-    			if (!foundWinningMove)*/
+    			if (!foundWinningMove)
     				moves_to_sim.add(options.get(r.nextInt(options.size())));
     		}
     		state = game.findNext(moves_to_sim, state);
