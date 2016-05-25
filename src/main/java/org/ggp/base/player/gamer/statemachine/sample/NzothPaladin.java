@@ -20,12 +20,8 @@ import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.propnet.SamplePropNetStateMachine;
 
-public class MiracleRogue extends SampleGamer {
+public class NzothPaladin extends SampleGamer {
 	private Random r = new Random();
-	//private Map<String, Double> goalCache = new HashMap<String, Double>();
-	//private ConcurrentMap<MachineState, Integer> nodeVisits = new ConcurrentHashMap<MachineState, Integer>();
-	//private ConcurrentMap<MachineState, Integer> nodeUtility = new ConcurrentHashMap<MachineState, Integer>();
-	//private ConcurrentMap<MachineState, MachineState> nodeParent = new ConcurrentHashMap<MachineState, MachineState>();
 	private long finishBy;
 	private List<GamestateNode> allNodes = new ArrayList<GamestateNode>();
 	private Map<MachineState, GamestateNode> stateToNode = new HashMap<MachineState, GamestateNode>();
@@ -42,7 +38,7 @@ public class MiracleRogue extends SampleGamer {
 
 	@Override
 	public String getName() {
-        return "MiracleRogue";
+        return "NzothPaladin";
     }
 
 	@Override
@@ -352,14 +348,21 @@ public class MiracleRogue extends SampleGamer {
 			if (System.currentTimeMillis() > finishBy)
         		return 50;
 
+			System.out.println("Should be false: " + propNet.stateIsCorrect());
+
     		if (game.isTerminal(state)) {
     			return game.findReward(getRole(), state);
     		}
+
+    		System.out.println("Should be true: " + propNet.stateIsCorrect());
+
+    		//System.out.println("After terminal call");
 
     		List<Move> moves_to_sim = new ArrayList<Move>();
 
     		for(int i = 0; i < game.getRoles().size(); i++) {
     			Role role = game.getRoles().get(i);
+    			//System.out.println("Next role's move: " + role);
 
     			if (role.equals(firstRole) && firstMove != null) {
     				moves_to_sim.add(firstMove);
@@ -451,5 +454,6 @@ public class MiracleRogue extends SampleGamer {
         // arbitrary setting based on nGames / second
         nGamesPerSimulation = (int) gamesPerSecond;
         if (nGamesPerSimulation < 2) nGamesPerSimulation = 2;
+        else if (nGamesPerSimulation > 100) nGamesPerSimulation = 50;
     }
 }

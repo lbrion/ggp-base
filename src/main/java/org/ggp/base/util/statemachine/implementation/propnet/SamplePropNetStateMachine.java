@@ -39,6 +39,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     private List<Set<Component>> factors;
     private boolean[] externalRep;
     private boolean[] componentIsCorrect;
+    private boolean stateIsCorrect;
 
     /**
      * Initializes the PropNetStateMachine. You should compute the topological
@@ -127,6 +128,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     	initProp.setValue(true);
 
     	populateExternalRep();
+    	stateIsCorrect = false;
+
     	return getStateFromBase();
     }
 
@@ -217,6 +220,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     		}
     	}
 
+    	//stateIsCorrect = false;
         return nextState;
     }
 
@@ -466,6 +470,9 @@ public class SamplePropNetStateMachine extends StateMachine {
     }
 
     private void markBases(MachineState state) {
+    	//if (stateIsCorrect)
+    	//	return;
+
     	Set<GdlSentence> stateGDL = state.getContents();
     	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
 
@@ -484,6 +491,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     			p.setValue(false);
     		}
     	}
+
+    	//stateIsCorrect = true;
 
     	//setAncestorsFalse(ancestors);
     }
@@ -543,6 +552,14 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     public boolean[] getExternalRepCorrect() {
     	return componentIsCorrect;
+    }
+
+    public boolean stateIsCorrect() {
+    	return stateIsCorrect;
+    }
+
+    public void setStateCorrect(boolean newValue) {
+    	stateIsCorrect = newValue;
     }
 
     // allows you to pass in new value array
