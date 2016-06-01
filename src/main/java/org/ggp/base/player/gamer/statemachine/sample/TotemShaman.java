@@ -450,8 +450,12 @@ public class TotemShaman extends SampleGamer {
         // arbitrary setting based on nGames / second
         if (gamesPerSecond > 100000) {
         	nGamesPerSimulation = 50000;
+        } else if (gamesPerSecond > 5000) {
+        	nGamesPerSimulation = 2500;
         } else if (gamesPerSecond > 1000) {
         	nGamesPerSimulation = 500;
+        } else if (gamesPerSecond > 500) {
+        	nGamesPerSimulation = 250;
         } else if (gamesPerSecond > 100) {
         	nGamesPerSimulation = 50;
         } else if (gamesPerSecond > 10) {
