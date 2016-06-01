@@ -45,6 +45,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     private boolean[] componentIsCorrect;
     private boolean stateIsCorrect;
 
+    private MachineState lastMachineState; // TODO: check using .equals to see if this was last one marked
+
     /**
      * Initializes the PropNetStateMachine. You should compute the topological
      * ordering here. Additionally you may compute the initial state here, at
@@ -122,7 +124,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     	clearPropnet();
     	Proposition initProp = propNet.getInitProposition();
     	initProp.setValue(true);
-    	return computeNextState();
+    	return computeNextState(null);
     }
 
     /**
@@ -181,7 +183,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     	clearPropnet();
     	markActions(moves);
     	markBases(state);
-    	return computeNextState();
+    	return computeNextState(state);
 
     	/*for (int i = 0; i < ordering.size(); i++) {
     		Component c = ordering.get(i);
@@ -431,8 +433,9 @@ public class SamplePropNetStateMachine extends StateMachine {
     private boolean markProposition(Component c) {
     	String type = c.getType();
 
-    	//if (c.isCorrect())
-    	//	return c.getVal();
+    	if (c.isCorrect()) {
+    		return c.getVal();
+    	}
 
     	if (c instanceof Proposition) {
 			if (c.getInputs().size() == 1 && !(c.getSingleInput() instanceof Transition)) {
@@ -472,24 +475,6 @@ public class SamplePropNetStateMachine extends StateMachine {
     	for (GdlSentence nextGdl : stateGDL) {
     		baseProps.get(nextGdl).setValue(true);
     	}
-    	/*
-    	//Set<Component> ancestors = new HashSet<Component>();
-    	for (GdlSentence gdl : baseProps.keySet()) {
-    		Proposition p = baseProps.get(gdl);
-    		if (stateGDL.contains(gdl)) {
-    			//if (p.getValue() == false)
-    				//ancestors.addAll(propNet.getPropAncestors(p));
-    				//propNet.setPropAncestorsNotCorrect(p);
-    			p.setValue(true);
-    		} else {
-    			//if (p.getValue() == true)
-    				//ancestors.addAll(propNet.getPropAncestors(p));
-    				//propNet.setPropAncestorsNotCorrect(p);
-    			p.setValue(false);
-    		}
-    	}
-
-    	//setAncestorsFalse(ancestors);*/
     }
 
     /* Note: this function looks good for now
@@ -519,6 +504,10 @@ public class SamplePropNetStateMachine extends StateMachine {
 		for (Proposition p: propNet.getInputPropositions().values()){
 			p.setValue(false);
 		}
+		for (Component c : ordering) {
+			c.setIsCorrect(false);
+		}
+
 		propNet.getInitProposition().setValue(false);
     }
 
@@ -589,20 +578,47 @@ public class SamplePropNetStateMachine extends StateMachine {
 	}
 
 
-	private MachineState computeNextState(){
+	private MachineState computeNextState(MachineState currState) {
 		int n = propNet.getBasePropositions().values().size();
-		//Proposition[] bases = propNet.getPropositionArray();
-		Proposition[] bases = propNet.getBasePropositions().values().toArray(new Proposition[n]);
+		Proposition[] bases = propNet.getPropositionArray();
 		boolean[] vals = new boolean[bases.length];
 
-		for (int i=0; i<bases.length; i++){
+		for (int i = 0; i < ordering.size(); i++) {
+    		Component c = ordering.get(i);
+
+    		boolean newVal = markProposition(c);
+    		c.setVal(newVal);
+    		c.setIsCorrect(true);
+    	}
+
+    	for (int i = 0; i < bases.length; i++) {
 			vals[i] = markProposition(bases[i].getSingleInput());
 		}
-		for (int i=0; i<bases.length; i++){
+
+    	if (currState == null) {
+    		for (int i = 0; i < bases.length; i++) {
+    			bases[i].setValue(vals[i]);
+    		}
+    		return computeCurrentState();
+    	}
+
+    	// tries to optimize from getStateFromBase() by building from pre-existing contents
+		MachineState nextState = currState.clone();
+        Set<GdlSentence> nextContents = nextState.getContents();
+
+		for (int i = 0; i < bases.length; i++) {
+			if (vals[i] == bases[i].getValue()) continue;
+
 			bases[i].setValue(vals[i]);
+			GdlSentence pSentence = bases[i].getName();
+			if (vals[i]) {
+				nextContents.add(pSentence);
+			} else {
+				nextContents.remove(pSentence);
+			}
 		}
 
-		return computeCurrentState();
+		return nextState;
 	}
 
     /**
