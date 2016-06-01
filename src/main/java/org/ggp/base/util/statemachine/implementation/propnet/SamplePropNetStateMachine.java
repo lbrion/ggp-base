@@ -43,7 +43,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     private List<Set<Component>> factors;
     private boolean stateIsCorrect;
 
-    private MachineState lastMachineState; // TODO: check using .equals to see if this was last one marked
+    private MachineState lastMachineState; // checks using .equals to see if this was last one marked
 
     // metrics that I am measuring and printing out in the players
     private int totalCalls;
@@ -494,7 +494,12 @@ public class SamplePropNetStateMachine extends StateMachine {
     	Map<GdlSentence, Proposition> baseProps = propNet.getBasePropositions();
 
     	for (GdlSentence nextGdl : stateGDL) {
-    		baseProps.get(nextGdl).setValue(true);
+    		Proposition p = baseProps.get(nextGdl);
+    		p.setValue(true);
+
+    		/*for (Component c : propNet.getPropAncestors(p)) {
+    			c.setIsCorrect(false);
+    		}*/
     	}
 
     	lastMachineState = state.clone();
@@ -517,6 +522,10 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     		Proposition p = moveToProp.get(concat);
     		p.setValue(true);
+
+    		/*for (Component c : propNet.getPropAncestors(p)) {
+    			c.setIsCorrect(false);
+    		}*/
     	}
     }
 
@@ -527,21 +536,12 @@ public class SamplePropNetStateMachine extends StateMachine {
 		for (Proposition p: propNet.getInputPropositions().values()){
 			p.setValue(false);
 		}
+
 		for (Component c : ordering) {
 			c.setIsCorrect(false);
 		}
 
 		propNet.getInitProposition().setValue(false);
-    }
-
-    private void clearInputProps() {
-
-    }
-
-    private void setAncestorsFalse(Set<Component> ancestors) {
-    	for (Component c : ancestors) {
-    		c.setIsCorrect(false);
-    	}
     }
 
     public boolean stateIsCorrect() {
