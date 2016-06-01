@@ -74,12 +74,21 @@ public class SamplePropNetStateMachine extends StateMachine {
             ordering = getOrdering(new ArrayList<Component>(propNet.getComponents()));
             System.out.println(ordering.size());
 
-            computeLatches();
+            //computeLatches();
+            //removeLatchesFromOrdering();
 
             propNet = OptimizingPropNetFactory.create(description);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void removeLatchesFromOrdering() {
+    	for (Proposition p : latches.keySet()) {
+    		ordering.remove(p);
+    		p.setIsCorrect(true);
+    		p.setValue(latches.get(p));
+    	}
     }
 
     public void computeLatches() {
@@ -97,7 +106,7 @@ public class SamplePropNetStateMachine extends StateMachine {
     }
 
     public void isLatch(Proposition p) {
-    	System.out.println("Checking if " + p + " is a latch.");
+    	//System.out.println("Checking if " + p + " is a latch.");
     	List<Component> dependencies = new LinkedList<Component>();
 
     	Queue<Component> toCheck = new LinkedList<Component>();
@@ -153,14 +162,14 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     	if(true_latch) {
     		latches.put(p, true);
-    		System.out.println(p + " is a true latch.");
+    		//System.out.println(p + " is a true latch.");
     	}
     	if(false_latch) {
     		latches.put(p, false);
-    		System.out.println(p + " is a false latch.");
+    		//System.out.println(p + " is a false latch.");
     	}
 
-    	System.out.println("There were " + dependencies.size() + " dependencies for this proposition.");
+    	//System.out.println("There were " + dependencies.size() + " dependencies for this proposition.");
 
     	clearPropnet();
     }
@@ -557,14 +566,6 @@ public class SamplePropNetStateMachine extends StateMachine {
     	String type = c.getType();
 
     	totalMarkPropositions++;
-
-    	if (latches.keySet().contains(c)) {
-    		boolean latch_val = latches.get(c);
-
-    		if(c.getVal() == latch_val)
-        		markPropositionsAvoided++;
-    			return latch_val;
-    	}
 
     	if (c.isCorrect()) {
     		markPropositionsAvoided++;
