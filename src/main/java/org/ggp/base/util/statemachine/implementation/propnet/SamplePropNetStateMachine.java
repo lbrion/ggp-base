@@ -41,11 +41,15 @@ public class SamplePropNetStateMachine extends StateMachine {
     private List<Role> roles;
     /** Components organized into disjoint sets of factors */
     private List<Set<Component>> factors;
-    private boolean[] externalRep;
-    private boolean[] componentIsCorrect;
     private boolean stateIsCorrect;
 
     private MachineState lastMachineState; // TODO: check using .equals to see if this was last one marked
+
+    // metrics that I am measuring and printing out in the players
+    private int totalCalls;
+    private int callsAvoided;
+    private int totalMarkPropositions;
+    private int markPropositionsAvoided;
 
     /**
      * Initializes the PropNetStateMachine. You should compute the topological
@@ -62,9 +66,6 @@ public class SamplePropNetStateMachine extends StateMachine {
             //factorPropnet();
             //getOrdering(new ArrayList<Component>(propNet.getComponents()));
             System.out.println(ordering.size());
-
-            externalRep = new boolean[propNet.getPropositions().size()];
-            componentIsCorrect = new boolean[propNet.getComponents().size()];
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -76,8 +77,13 @@ public class SamplePropNetStateMachine extends StateMachine {
      */
     @Override
     public boolean isTerminal(MachineState state) {
-    	clearPropnet();
-    	markBases(state);
+    	if (lastMachineState == null || !lastMachineState.equals(state)) {
+			clearPropnet();
+			markBases(state);
+		} else {
+			callsAvoided++;
+		}
+		totalCalls++;
 
     	Proposition terminalProp = propNet.getTerminalProposition();
     	return markProposition(terminalProp);
@@ -93,8 +99,13 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public int getGoal(MachineState state, Role role)
             throws GoalDefinitionException {
-    	clearPropnet();
-    	markBases(state);
+    	if (lastMachineState == null || !lastMachineState.equals(state)) {
+			clearPropnet();
+			markBases(state);
+		} else {
+			callsAvoided++;
+		}
+		totalCalls++;
 
     	Set<Proposition> goalProps = propNet.getGoalPropositions().get(role);
     	int goalReward = 0;
@@ -151,8 +162,14 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public List<Move> getLegalMoves(MachineState state, Role role)
             throws MoveDefinitionException {
-    	clearPropnet();
-    	markBases(state);
+    	if (lastMachineState == null || !lastMachineState.equals(state)) {
+			clearPropnet();
+			markBases(state);
+		} else {
+			callsAvoided++;
+		}
+		totalCalls++;
+
     	Map<String, Proposition> moveToProp = propNet.getMoveToProp();
     	List<Move> legalMoves = new ArrayList<Move>();
 
@@ -180,9 +197,11 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public MachineState getNextState(MachineState state, List<Move> moves)
             throws TransitionDefinitionException {
-    	clearPropnet();
+    	totalCalls++;
+		clearPropnet();
+		markBases(state);
+
     	markActions(moves);
-    	markBases(state);
     	return computeNextState(state);
 
     	/*for (int i = 0; i < ordering.size(); i++) {
@@ -433,7 +452,9 @@ public class SamplePropNetStateMachine extends StateMachine {
     private boolean markProposition(Component c) {
     	String type = c.getType();
 
+    	totalMarkPropositions++;
     	if (c.isCorrect()) {
+    		markPropositionsAvoided++;
     		return c.getVal();
     	}
 
@@ -475,6 +496,8 @@ public class SamplePropNetStateMachine extends StateMachine {
     	for (GdlSentence nextGdl : stateGDL) {
     		baseProps.get(nextGdl).setValue(true);
     	}
+
+    	lastMachineState = state.clone();
     }
 
     /* Note: this function looks good for now
@@ -511,18 +534,14 @@ public class SamplePropNetStateMachine extends StateMachine {
 		propNet.getInitProposition().setValue(false);
     }
 
+    private void clearInputProps() {
+
+    }
+
     private void setAncestorsFalse(Set<Component> ancestors) {
     	for (Component c : ancestors) {
     		c.setIsCorrect(false);
     	}
-    }
-
-    public boolean[] getExternalRep() {
-    	return externalRep;
-    }
-
-    public boolean[] getExternalRepCorrect() {
-    	return componentIsCorrect;
     }
 
     public boolean stateIsCorrect() {
@@ -531,38 +550,6 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     public void setStateCorrect(boolean newValue) {
     	stateIsCorrect = newValue;
-    }
-
-    // allows you to pass in new value array
-    public void setExternalRep(boolean[] newValues, boolean[] componentIsCorrect) {
-    	externalRep = newValues.clone();
-    	List<Proposition> allProps = propNet.getPropositions();
-    	for (int i = 0; i < allProps.size(); i++) {
-    		allProps.get(i).setValue(newValues[i]);
-    	}
-
-    	Component[] allComp = propNet.getComponentsArray();
-    	for (int i = 0; i < allComp.length; i++) {
-    		allComp[i].setIsCorrect(componentIsCorrect[i]);
-    	}
-    }
-
-    public void populateExternalRep() {
-    	List<Proposition> allProps = propNet.getPropositions();
-    	for (int i = 0; i < allProps.size(); i++) {
-    		externalRep[i] = allProps.get(i).getValue();
-    	}
-
-    	Component[] allComp = propNet.getComponentsArray();
-    	for (int i = 0; i < allComp.length; i++) {
-    		componentIsCorrect[i] = allComp[i].isCorrect();
-    	}
-    }
-
-    public void resetPropCorrect() {
-    	for (Component c : propNet.getComponents()) {
-    		c.setIsCorrect(false);
-    	}
     }
 
     private MachineState computeCurrentState(){
@@ -619,6 +606,22 @@ public class SamplePropNetStateMachine extends StateMachine {
 		}
 
 		return nextState;
+	}
+
+	public int getTotalCalls() {
+		return totalCalls;
+	}
+
+	public int getCallsAvoided() {
+		return callsAvoided;
+	}
+
+	public int getTotalMarkPropositions() {
+		return totalMarkPropositions;
+	}
+
+	public int getMarkPropositionsAvoided() {
+		return markPropositionsAvoided;
 	}
 
     /**
