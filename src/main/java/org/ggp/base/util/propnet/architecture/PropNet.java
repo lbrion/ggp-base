@@ -367,12 +367,6 @@ public final class PropNet
     }
 
     private void fillPropositionArray() {
-    	/*propositionArray = new Proposition[propositions.size()];
-    	for (int i = 0; i < propositions.size(); i++) {
-    		Proposition p = propositions.get(i);
-    		propositionArray[i] = p;
-    	}*/
-
     	int n = basePropositions.values().size();
 		propositionArray = basePropositions.values().toArray(new Proposition[n]);
     }

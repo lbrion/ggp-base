@@ -264,8 +264,8 @@ public class MiracleRogue extends SampleGamer {
 				return;
 
 			for (int i = 0; i < legalMoves.size(); i++) {
-				boolean[] oldPropnetState = propNet.getExternalRep();
-				boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
+				//boolean[] oldPropnetState = propNet.getExternalRep();
+				//boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
 
 				MachineState nextState = game.findNext(legalMoves.get(i), selectedState);
 				GamestateNode nextNode = new GamestateNode(selectedNode, nextState);
@@ -273,7 +273,7 @@ public class MiracleRogue extends SampleGamer {
 				allNodes.add(nextNode);
 				stateToNode.put(nextState, nextNode);
 
-				propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
+				//propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
 			}
 		} else {
 			List<Move> ourLegalMoves = game.getLegalMoves(selectedState, getRole());
@@ -304,8 +304,8 @@ public class MiracleRogue extends SampleGamer {
 		int total = 0;
 		for (int i = 0; i < count; i++) {
 			nDepthChargesTurn++;
-			boolean[] oldPropnetState = propNet.getExternalRep();
-			boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
+			//boolean[] oldPropnetState = propNet.getExternalRep();
+			//boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
 
 			if (!selectedNode.isValidState()) {
 				Move firstMove = selectedNode.getPreviousMove(getRole());
@@ -314,7 +314,7 @@ public class MiracleRogue extends SampleGamer {
 				total = total + depthcharge(getRole(), null, state);
 			}
 
-			propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
+			//propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
 
 			if (System.currentTimeMillis() > finishBy) {
 				return total / (i + 1);
@@ -390,20 +390,20 @@ public class MiracleRogue extends SampleGamer {
     				List<List<Move>> possibleFutures = game.getLegalJointMoves(state, role, options.get(j));
 
     				for (int k = 0; k < possibleFutures.size(); k++) {
-    					boolean[] oldPropnetState = propNet.getExternalRep();
-    					boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
+    					//boolean[] oldPropnetState = propNet.getExternalRep();
+    					//boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
     					MachineState futureState = game.findNext(possibleFutures.get(k), state);
 
     					if (game.isTerminal(futureState)) {
     						if (game.findReward(role, futureState) == 100) {
         						moves_to_sim.add(options.get(j));
         						foundWinningMove = true;
-        						propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
+        						//propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
         						break;
     						}
     					}
 
-    					propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
+    					//propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
     				}
 
     				if (foundWinningMove) break;

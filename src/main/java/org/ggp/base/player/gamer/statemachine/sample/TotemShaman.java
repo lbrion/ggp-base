@@ -14,9 +14,11 @@ import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.StateMachine;
+import org.ggp.base.util.statemachine.cache.CachedStateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
+import org.ggp.base.util.statemachine.implementation.propnet.SamplePropNetStateMachine;
 
 public class TotemShaman extends SampleGamer {
 	private Random r = new Random();
@@ -45,6 +47,7 @@ public class TotemShaman extends SampleGamer {
 		System.out.println();
 		System.out.println("-------- Starting new move -------");
 		StateMachine game = getStateMachine();
+		SamplePropNetStateMachine propNet = (SamplePropNetStateMachine)((CachedStateMachine) getStateMachine()).getBackedMachine();
         long start = System.currentTimeMillis();
         finishBy = timeout - finishByTime;
 
@@ -104,6 +107,10 @@ public class TotemShaman extends SampleGamer {
         nDepthChargesGame += nDepthChargesTurn;
         System.out.println("[MCTS] " + count + " iterations");
         System.out.println("[SIMULATED] " + nDepthChargesTurn + " games, [TOTAL] " + nDepthChargesGame);
+        System.out.println("[PROPNET CALLS] " + propNet.getTotalCalls() + ", [AVOIDED] " + propNet.getCallsAvoided() +
+        		" === " + ((double) propNet.getCallsAvoided() * 100) / propNet.getTotalCalls() + "%");
+        System.out.println("[MARKP CALLS] " + propNet.getTotalMarkPropositions() + ", [CACHED] " + propNet.getMarkPropositionsAvoided() +
+        		" === " + ((double) propNet.getMarkPropositionsAvoided() * 100) / propNet.getTotalMarkPropositions() + "%");
         double score = 0;
 
         // find max node over our actions
