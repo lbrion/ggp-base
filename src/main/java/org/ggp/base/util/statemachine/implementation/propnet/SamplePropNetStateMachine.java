@@ -2,9 +2,12 @@ package org.ggp.base.util.statemachine.implementation.propnet;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 import org.ggp.base.util.UnionFind;
@@ -41,6 +44,9 @@ public class SamplePropNetStateMachine extends StateMachine {
     private List<Role> roles;
     /** Components organized into disjoint sets of factors */
     private List<Set<Component>> factors;
+
+    private Map<Proposition, Boolean> latches;
+
     private boolean[] externalRep;
     private boolean[] componentIsCorrect;
     private boolean stateIsCorrect;
@@ -55,19 +61,117 @@ public class SamplePropNetStateMachine extends StateMachine {
     @Override
     public void initialize(List<Gdl> description) {
         try {
+        	latches = new HashMap<Proposition, Boolean>();
             propNet = OptimizingPropNetFactory.create(description);
             roles = propNet.getRoles();
-            if(roles.size() == 1) ordering = getOrdering(factorPropnet());
-            else ordering = getOrdering(new ArrayList<Component>(propNet.getComponents()));
+            //if(roles.size() == 1) ordering = getOrdering(factorPropnet());
+            //else ordering = getOrdering(new ArrayList<Component>(propNet.getComponents()));
             //factorPropnet();
-            //getOrdering(new ArrayList<Component>(propNet.getComponents()));
+            ordering = getOrdering(new ArrayList<Component>(propNet.getComponents()));
             System.out.println(ordering.size());
 
             externalRep = new boolean[propNet.getPropositions().size()];
             componentIsCorrect = new boolean[propNet.getComponents().size()];
+
+            computeLatches();
+
+            propNet = OptimizingPropNetFactory.create(description);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void computeLatches() {
+    	System.out.println("Beginning latch computation.");
+    	for(Component c : ordering) {
+    		if (c instanceof Proposition) {
+        		Proposition p = (Proposition) c;
+
+        		if(c.getInputs().size() == 1 && !(c.getSingleInput() instanceof Transition)) {
+    	        	isLatch(p);
+        		}
+    		}
+    	}
+    	System.out.println("Latch computation complete. There are " + latches.size() + " latches.");
+    }
+
+    public void isLatch(Proposition p) {
+    	System.out.println("Checking if " + p + " is a latch.");
+    	List<Component> dependencies = new LinkedList<Component>();
+
+    	Queue<Component> toCheck = new LinkedList<Component>();
+
+    	toCheck.add(p);
+
+    	while(toCheck.size() != 0) {
+    		Component cur = toCheck.remove();
+    		if(cur.getType() == "base" || cur.getType() == "input") {
+    			dependencies.add(cur);
+    		}
+    		else if(cur.getType() == "or") {
+    			toCheck.add(cur.getSingleInput());
+    		}
+    		else {
+        		for(Component dependency : cur.getInputs()) {
+        			toCheck.add(dependency);
+        		}
+    		}
+    	}
+
+    	boolean true_latch = true;
+    	boolean false_latch = true;
+
+    	//Check if true
+    	for(int i = 0; i < Math.pow(2, dependencies.size() - 1); i++){
+        	clearPropnet();
+
+    		setBooleans(dependencies, i);
+
+    		boolean value = markProposition(p);
+
+    		if(!value) {
+    			//System.out.println(p + " is not a true latch.");
+    			true_latch = false;
+    			break;
+    		}
+    	}
+    	//Check if false
+    	for(int i = 0; i < Math.pow(2, dependencies.size() - 1); i++){
+        	clearPropnet();
+
+    		setBooleans(dependencies, i);
+
+    		boolean value = markProposition(p);
+
+    		if(value) {
+    			//System.out.println(p + " is not a false latch.");
+    			false_latch = false;
+    			break;
+    		}
+    	}
+
+    	if(true_latch) {
+    		latches.put(p, true);
+    		System.out.println(p + " is a true latch.");
+    	}
+    	if(false_latch) {
+    		latches.put(p, false);
+    		System.out.println(p + " is a false latch.");
+    	}
+
+    	System.out.println("There were " + dependencies.size() + " dependencies for this proposition.");
+
+    	clearPropnet();
+    }
+
+    public void setBooleans(List<Component> to_set, int bits) {
+    	for(int i = 0; i < to_set.size(); i++){
+    		Boolean value;
+    		if(((bits >> i) & 1) == 0) value = false;
+    		else value = true;
+
+    		to_set.get(i).setVal(value);
+    	}
     }
 
     /**
@@ -432,6 +536,13 @@ public class SamplePropNetStateMachine extends StateMachine {
 
     private boolean markProposition(Component c) {
     	String type = c.getType();
+
+    	if (latches.keySet().contains(c)) {
+    		boolean latch_val = latches.get(c);
+
+    		if(c.getVal() == latch_val)
+    			return latch_val;
+    	}
 
     	if (c.isCorrect()) {
     		return c.getVal();
