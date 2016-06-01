@@ -282,7 +282,7 @@ public class ControlWarrior extends SampleGamer {
 	 */
 	public int simulate(GamestateNode selectedNode, int count) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
 		MachineState state = selectedNode.getState();
-		System.out.println("[simulate] " + count);
+		//System.out.println("[simulate] " + count);
 
 		int total = 0;
 		for (int i = 0; i < count; i++) {
@@ -376,7 +376,6 @@ public class ControlWarrior extends SampleGamer {
 						if (futureOptions.size() == 1 && futureOptions.get(0).toString().equals("noop")) {
 							continue;
 						} else {
-							System.out.println("pentago!");
 							for (int x = 0; x < futureOptions.size(); x++) {
 								List<List<Move>> possibleFutureFutures = game.getLegalJointMoves(futureState, nextRole, futureOptions.get(x));
 

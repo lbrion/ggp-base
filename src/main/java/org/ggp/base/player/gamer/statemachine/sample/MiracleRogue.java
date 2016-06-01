@@ -119,6 +119,8 @@ public class MiracleRogue extends SampleGamer {
         	double utility = nextChild.getUtility() / nextChild.getVisits();
 
         	System.out.println(nextChild.getPreviousMove(getRole()).toString() + " , " + utility);
+        	System.out.println(nextChild.getUtility() + " / " + nextChild.getVisits());
+
 
         	if (utility > score) {
         		score = utility;
@@ -148,6 +150,11 @@ public class MiracleRogue extends SampleGamer {
 		// simulate
 		int value = simulate(selectedNode, nGamesPerSimulation);
 
+		/*if (selectedNode.isValidState())
+			System.out.println("[VALID] " + value);
+		else
+			System.out.println("[INVALID] " + value);*/
+
 		// back-propagate
 		propagate(selectedNode, value);
 		selectedNode.markShouldVisit(false);
@@ -160,12 +167,10 @@ public class MiracleRogue extends SampleGamer {
 	 */
 	public GamestateNode select(GamestateNode stateNode) throws MoveDefinitionException {
 		if (stateNode == null) return null;
-		//if (stateNode.getVisits() == 0) return stateNode;
 		if (stateNode.shouldVisit()) return stateNode;
 
 		for (int i = 0; i < stateNode.getChildren().size(); i++) {
 			GamestateNode nextChild = stateNode.getChildren().get(i);
-			//if (nextChild.getVisits() == 0) return nextChild;
 			if (nextChild.shouldVisit()) return nextChild;
 		}
 
@@ -241,6 +246,7 @@ public class MiracleRogue extends SampleGamer {
 	public void expand(GamestateNode selectedNode) throws MoveDefinitionException, TransitionDefinitionException {
 		MachineState selectedState = selectedNode.getState();
 		StateMachine game = getStateMachine();
+		SamplePropNetStateMachine propNet = (SamplePropNetStateMachine)((CachedStateMachine) getStateMachine()).getBackedMachine();
 
 		if (game.isTerminal(selectedState)) {
 			return;
@@ -258,11 +264,16 @@ public class MiracleRogue extends SampleGamer {
 				return;
 
 			for (int i = 0; i < legalMoves.size(); i++) {
+				boolean[] oldPropnetState = propNet.getExternalRep();
+				boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
+
 				MachineState nextState = game.findNext(legalMoves.get(i), selectedState);
 				GamestateNode nextNode = new GamestateNode(selectedNode, nextState);
 				selectedNode.addChild(nextNode);
 				allNodes.add(nextNode);
 				stateToNode.put(nextState, nextNode);
+
+				propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
 			}
 		} else {
 			List<Move> ourLegalMoves = game.getLegalMoves(selectedState, getRole());
@@ -288,7 +299,7 @@ public class MiracleRogue extends SampleGamer {
 
 		// get prop net state machine
 		SamplePropNetStateMachine propNet = (SamplePropNetStateMachine)((CachedStateMachine) getStateMachine()).getBackedMachine();
-		//System.out.println("[simulate] " + count);
+		//System.out.println("[simulate] " + selectedNode.getState());
 
 		int total = 0;
 		for (int i = 0; i < count; i++) {
@@ -434,7 +445,7 @@ public class MiracleRogue extends SampleGamer {
         		break;
 
         	long sTime = System.currentTimeMillis();
-    		int r = simulateGame(getRole(), null, copy);
+    		//int r = simulateGame(getRole(), null, copy);
     		long eTime = System.currentTimeMillis();
 
     		//System.out.println("[META] Took " + (eTime - sTime) + " to play.");
@@ -449,7 +460,9 @@ public class MiracleRogue extends SampleGamer {
         gamesPerSecond *= 1000;
 
         // arbitrary setting based on nGames / second
-        nGamesPerSimulation = (int) gamesPerSecond;
-        if (nGamesPerSimulation < 2) nGamesPerSimulation = 2;
+        //nGamesPerSimulation = (int) gamesPerSecond;
+        //if (nGamesPerSimulation < 2) nGamesPerSimulation = 2;
+        //else if (nGamesPerSimulation > 1000) nGamesPerSimulation = 100;
+        nGamesPerSimulation = 100;
     }
 }

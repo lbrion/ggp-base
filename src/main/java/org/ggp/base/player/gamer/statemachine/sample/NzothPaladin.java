@@ -1,4 +1,9 @@
-//Currently implements MCTS
+/* This file attempts to use the propnet w/ a refactored MCTS version of ControlWarrior
+ * As of 5/31 this file has been discovered to have a major error - it only searches one move
+ * instead of all possible choices, so use ControlWarrior instead
+ *
+ *
+ */
 
 package org.ggp.base.player.gamer.statemachine.sample;
 
@@ -289,9 +294,8 @@ public class NzothPaladin extends SampleGamer {
 		int total = 0;
 		for (int i = 0; i < count; i++) {
 			nDepthChargesTurn++;
-			boolean[] oldPropnetState = propNet.getExternalRep();
-			boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
-			//boolean stateCorrect = propNet.stateIsCorrect();
+			//boolean[] oldPropnetState = propNet.getExternalRep();
+			//boolean[] oldPropnetCorrect = propNet.getExternalRepCorrect();
 
 			if (!selectedNode.isValidState()) {
 				Move firstMove = selectedNode.getPreviousMove(getRole());
@@ -300,8 +304,7 @@ public class NzothPaladin extends SampleGamer {
 				total = total + depthcharge(getRole(), null, state);
 			}
 
-			propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
-			//propNet.setStateCorrect(stateCorrect);
+			//propNet.setExternalRep(oldPropnetState, oldPropnetCorrect);
 
 			if (System.currentTimeMillis() > finishBy) {
 				return total / (i + 1);
